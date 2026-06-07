@@ -43,11 +43,11 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage      = "https://github.com/williamcaban/judge-kappa"
-Repository    = "https://github.com/williamcaban/judge-kappa"
-Documentation = "https://github.com/williamcaban/judge-kappa/tree/main/docs"
-Issues        = "https://github.com/williamcaban/judge-kappa/issues"
-Changelog     = "https://github.com/williamcaban/judge-kappa/blob/main/CHANGELOG.md"
+Homepage      = "https://github.com/williamcaban/judge-kappa-eval"
+Repository    = "https://github.com/williamcaban/judge-kappa-eval"
+Documentation = "https://github.com/williamcaban/judge-kappa-eval/tree/main/docs"
+Issues        = "https://github.com/williamcaban/judge-kappa-eval/issues"
+Changelog     = "https://github.com/williamcaban/judge-kappa-eval/blob/main/CHANGELOG.md"
 
 [project.scripts]
 judge-kappa = "judge_kappa.cli.main:app"

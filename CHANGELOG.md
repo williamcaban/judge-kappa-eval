@@ -71,5 +71,5 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 8 test modules, 60+ tests, zero real LLM calls (MockLLMBackend)
 - Coverage: models, adapters, judges (scoring math, ICL, malformed JSON), panels, agreement metrics, bias detectors, evaluator integration, CLI schema validation, key resolution
 
-[Unreleased]: https://github.com/williamcaban/judge-kappa/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/williamcaban/judge-kappa/releases/tag/v0.1.0
+[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/williamcaban/judge-kappa-eval/releases/tag/v0.1.0

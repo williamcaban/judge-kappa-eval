@@ -22,7 +22,7 @@ Unified LLM evaluation that bridges **agent-skills-eval** (A/B uplift, assertion
 ## Installation
 
 ```bash
-git clone https://github.com/williamcaban/judge-kappa
+git clone https://github.com/williamcaban/judge-kappa-eval
 cd judge-kappa
 
 # Python 3.12+ required
@@ -102,4 +102,4 @@ uv run mypy src                                # type check
 
 ## License
 
-Apache 2.0 — [github.com/williamcaban/judge-kappa](https://github.com/williamcaban/judge-kappa)
+Apache 2.0 — [github.com/williamcaban/judge-kappa-eval](https://github.com/williamcaban/judge-kappa-eval)
