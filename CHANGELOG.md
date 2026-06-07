@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to JuryEval are documented in this file.
+All notable changes to judge-kappa are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -53,9 +53,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `DatasetAdapter` — reads list[dict] in MLflow LLMaJ format
 
 **CLI**
-- `jury-eval run` — run evaluation from YAML config; `--format text|json|jsonl`; `--verdicts`
-- `jury-eval validate` — validate config without running evaluation
-- `jury-eval schema` — print full JSON Schema for both config modes
+- `judge-kappa run` — run evaluation from YAML config; `--format text|json|jsonl`; `--verdicts`
+- `judge-kappa validate` — validate config without running evaluation
+- `judge-kappa schema` — print full JSON Schema for both config modes
 
 **Output models**
 - `EvalReport` — A/B uplift, Krippendorff's α, Cohen's κ, positional bias rate, verbosity ρ
@@ -71,5 +71,5 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 8 test modules, 60+ tests, zero real LLM calls (MockLLMBackend)
 - Coverage: models, adapters, judges (scoring math, ICL, malformed JSON), panels, agreement metrics, bias detectors, evaluator integration, CLI schema validation, key resolution
 
-[Unreleased]: https://github.com/williamcaban/JuryEval/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/williamcaban/JuryEval/releases/tag/v0.1.0
+[Unreleased]: https://github.com/williamcaban/judge-kappa/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/williamcaban/judge-kappa/releases/tag/v0.1.0

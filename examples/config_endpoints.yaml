@@ -1,4 +1,4 @@
-# jury-eval config — endpoint comparison
+# judge-kappa config — endpoint comparison
 #
 # Compares two live OpenAI-compatible model endpoints as evaluation targets.
 # Each variant specifies its OWN generation backend — no shared backend required.
@@ -13,7 +13,7 @@
 # Judges remain independent from the generation backends.
 #
 # Run:
-#   jury-eval run examples/config_endpoints.yaml
+#   judge-kappa run examples/config_endpoints.yaml
 #
 # Required env vars:
 #   ANTHROPIC_API_KEY        — for judges and positional_judge

@@ -1,7 +1,7 @@
-# jury-eval config — dataset mode (MLflow LLMaJ compatible)
+# judge-kappa config — dataset mode (MLflow LLMaJ compatible)
 #
-# Run:  jury-eval run config_dataset.yaml
-#       jury-eval run config_dataset.yaml --format json --output report.json
+# Run:  judge-kappa run config_dataset.yaml
+#       judge-kappa run config_dataset.yaml --format json --output report.json
 #
 # dataset_file must be JSONL (one object per line) or a JSON array.
 # Each object schema:

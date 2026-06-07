@@ -1,4 +1,4 @@
-# jury-eval config — dataset mode with homogeneous JudgePanel
+# judge-kappa config — dataset mode with homogeneous JudgePanel
 #
 # Use this when you want MLflow-compatible dataset evaluation AND need to
 # verify that all your judges read the rubric consistently before trusting scores.
@@ -15,8 +15,8 @@
 #   Jury  = different rubrics, diverse views  ← config_dataset.yaml
 #
 # Run:
-#   jury-eval run examples/config_dataset_panel.yaml
-#   jury-eval run examples/config_dataset_panel.yaml --format json --output report.json
+#   judge-kappa run examples/config_dataset_panel.yaml
+#   judge-kappa run examples/config_dataset_panel.yaml --format json --output report.json
 #
 # Required env vars:
 #   ANTHROPIC_API_KEY

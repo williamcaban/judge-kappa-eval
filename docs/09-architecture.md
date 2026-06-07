@@ -1,13 +1,13 @@
 # Architecture and Extension Points
 
-JuryEval is built on abstract base classes (ABCs) and Protocols. Every component can be replaced or extended without modifying existing code.
+judge-kappa is built on abstract base classes (ABCs) and Protocols. Every component can be replaced or extended without modifying existing code.
 
 ---
 
 ## Package structure
 
 ```
-src/jury_eval/
+src/judge_kappa/
 ├── models.py           # Pydantic domain models — stable schema contract
 ├── llm/
 │   ├── base.py         # LLMBackend Protocol (structural — duck typing)
@@ -51,13 +51,13 @@ src/jury_eval/
 Any object with a `complete(system, user, temperature) -> str` method works as a backend. No inheritance required.
 
 ```python
-from jury_eval.llm.base import LLMBackend
+from judge_kappa.llm.base import LLMBackend
 
 class MyBackend:
     def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
         return call_my_model(system, user)
 
-# Works as a drop-in — no import from jury_eval needed
+# Works as a drop-in — no import from judge_kappa needed
 judge = AssertionJudge("my-judge", MyBackend())
 ```
 
@@ -89,7 +89,7 @@ Every module has an ABC that defines the contract. Subclass it to add a new impl
 ### Add a new LLM provider
 
 ```python
-# src/jury_eval/llm/bedrock_backend.py
+# src/judge_kappa/llm/bedrock_backend.py
 class BedrockBackend:
     def __init__(self, model_id: str, region: str = "us-east-1") -> None:
         import boto3
@@ -114,9 +114,9 @@ No changes needed anywhere else — just pass it to any judge.
 ### Add a new judge type
 
 ```python
-# src/jury_eval/judges/checklist.py
-from jury_eval.judges.base import LLMJudge
-from jury_eval.models import EvalCase, JudgeVerdict
+# src/judge_kappa/judges/checklist.py
+from judge_kappa.judges.base import LLMJudge
+from judge_kappa.models import EvalCase, JudgeVerdict
 
 class ChecklistJudge(LLMJudge):
     """Evaluates output against a checklist of binary criteria."""
@@ -133,9 +133,9 @@ class ChecklistJudge(LLMJudge):
 ### Add a new agreement metric
 
 ```python
-# src/jury_eval/agreement/gwet.py
-from jury_eval.agreement.base import AgreementMetric
-from jury_eval.models import AgreementResult, JudgeVerdict, ScaleType
+# src/judge_kappa/agreement/gwet.py
+from judge_kappa.agreement.base import AgreementMetric
+from judge_kappa.models import AgreementResult, JudgeVerdict, ScaleType
 
 class GwetAC1(AgreementMetric):
     """Gwet's AC1 — more robust than κ when rater agreement is very high."""
@@ -147,7 +147,7 @@ class GwetAC1(AgreementMetric):
 
 Inject it into `JuryEvaluator`:
 ```python
-from jury_eval.evaluator import JuryEvaluator
+from judge_kappa.evaluator import JuryEvaluator
 
 evaluator = JuryEvaluator(panel=panel, generation_backend=backend)
 evaluator._kappa_metric = GwetAC1()   # override default CohenKappa
@@ -156,9 +156,9 @@ evaluator._kappa_metric = GwetAC1()   # override default CohenKappa
 ### Add a new bias detector
 
 ```python
-# src/jury_eval/bias/length_normalization.py
-from jury_eval.bias.base import BiasDetector
-from jury_eval.models import BiasResult, JudgeVerdict
+# src/judge_kappa/bias/length_normalization.py
+from judge_kappa.bias.base import BiasDetector
+from judge_kappa.models import BiasResult, JudgeVerdict
 
 class LengthNormalizationBiasDetector(BiasDetector):
     """Detects whether scores change significantly when outputs are length-normalized."""

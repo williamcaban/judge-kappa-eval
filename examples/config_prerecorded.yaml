@@ -1,4 +1,4 @@
-# jury-eval config — pre-recorded outputs (no generation model called)
+# judge-kappa config — pre-recorded outputs (no generation model called)
 #
 # Use when you already have the outputs from both systems and want to
 # score them without calling any generation model. Typical scenarios:
@@ -26,7 +26,7 @@
 #   }
 #
 # Run:
-#   jury-eval run examples/config_prerecorded.yaml
+#   judge-kappa run examples/config_prerecorded.yaml
 #
 # Required env vars:
 #   ANTHROPIC_API_KEY      — for judges only; no generation model is called

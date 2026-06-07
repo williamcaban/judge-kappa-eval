@@ -1,8 +1,8 @@
-# JuryEval
+# judge-kappa
 
 Unified LLM evaluation that bridges **agent-skills-eval** (A/B uplift, assertion lists) and **MLflow LLMaJ** (datasets, named rubric dimensions) while adding statistical rigor missing from both.
 
-| Capability | agent-skills-eval | MLflow LLMaJ | JuryEval |
+| Capability | agent-skills-eval | MLflow LLMaJ | judge-kappa |
 |---|---|---|---|
 | Native A/B uplift | ✅ | ❌ | ✅ |
 | Assertion-based scoring | ✅ | ❌ | ✅ |
@@ -22,8 +22,8 @@ Unified LLM evaluation that bridges **agent-skills-eval** (A/B uplift, assertion
 ## Installation
 
 ```bash
-git clone https://github.com/williamcaban/JuryEval
-cd JuryEval
+git clone https://github.com/williamcaban/judge-kappa
+cd judge-kappa
 
 # Python 3.12+ required
 uv sync --all-extras          # recommended
@@ -42,16 +42,16 @@ export OPENAI_API_KEY="sk-..."
 
 ```bash
 # Validate a config
-jury-eval validate examples/config_skill_minimal.yaml
+judge-kappa validate examples/config_skill_minimal.yaml
 
 # Run evaluation
-jury-eval run examples/config_skill_minimal.yaml
+judge-kappa run examples/config_skill_minimal.yaml
 
 # JSON output → file
-jury-eval run examples/config_skill.yaml --format json --output report.json
+judge-kappa run examples/config_skill.yaml --format json --output report.json
 
 # Print config JSON Schema (for editor autocomplete)
-jury-eval schema
+judge-kappa schema
 ```
 
 ---
@@ -102,4 +102,4 @@ uv run mypy src                                # type check
 
 ## License
 
-Apache 2.0 — [github.com/williamcaban/JuryEval](https://github.com/williamcaban/JuryEval)
+Apache 2.0 — [github.com/williamcaban/judge-kappa](https://github.com/williamcaban/judge-kappa)

@@ -1,6 +1,6 @@
 # Supported Evaluation Target Types
 
-JuryEval has six entry points covering every way you might have system outputs.
+judge-kappa has six entry points covering every way you might have system outputs.
 
 ---
 
@@ -135,7 +135,7 @@ See [docs/03-pairwise-tournament.md](03-pairwise-tournament.md) for full detail.
 You have 3–6 systems to rank. Runs every pair through `PairwiseJudge` (round-robin) and derives Elo ratings.
 
 ```python
-from jury_eval import TournamentEvaluator
+from judge_kappa import TournamentEvaluator
 
 tournament = TournamentEvaluator(pairwise_judge=judge)
 report = tournament.run_dataset(

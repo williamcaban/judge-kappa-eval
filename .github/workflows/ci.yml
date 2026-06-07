@@ -61,7 +61,7 @@ jobs:
         run: |
           for f in examples/config_*.yaml; do
             echo "Validating $f..."
-            uv run jury-eval validate "$f" || exit 1
+            uv run judge-kappa validate "$f" || exit 1
           done
 
   build:

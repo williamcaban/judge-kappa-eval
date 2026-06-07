@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import pytest
 
-from jury_eval.agreement.alpha import KrippendorffAlpha, _interpret
-from jury_eval.agreement.kappa import CohenKappa
-from jury_eval.models import ScaleType
+from judge_kappa.agreement.alpha import KrippendorffAlpha, _interpret
+from judge_kappa.agreement.kappa import CohenKappa
+from judge_kappa.models import ScaleType
 from tests.conftest import make_verdict
 
 

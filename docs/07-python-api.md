@@ -1,13 +1,13 @@
 # Python API
 
-All public symbols are importable directly from `jury_eval`.
+All public symbols are importable directly from `judge_kappa`.
 
 ---
 
 ## Core objects
 
 ```python
-from jury_eval import (
+from judge_kappa import (
     # Evaluators
     JuryEvaluator,
     TournamentEvaluator,
@@ -63,7 +63,7 @@ from jury_eval import (
 ## Pattern 1 — Skill evaluation (assertion-based A/B)
 
 ```python
-from jury_eval import (
+from judge_kappa import (
     JuryEvaluator, JudgePanel, AssertionJudge,
     AnthropicBackend, CalibrationExample, Variant, ScaleType,
 )
@@ -115,7 +115,7 @@ print(f"κ:      {report.agreement.kappa:.3f}")
 ## Pattern 2 — Dataset evaluation (rubric-based, MLflow-compatible)
 
 ```python
-from jury_eval import (
+from judge_kappa import (
     JuryEvaluator, JudgeJury, RubricJudge, RubricDimension,
     AnthropicBackend, OpenAIBackend, AggregationStrategy,
 )
@@ -150,7 +150,7 @@ report = evaluator.evaluate_dataset(data=data, predict_fn=my_rag_pipeline)
 
 # Serialize — compatible with MLflow artifact logging
 import json, mlflow
-mlflow.log_dict(json.loads(report.model_dump_json()), "jury_eval_report.json")
+mlflow.log_dict(json.loads(report.model_dump_json()), "judge_kappa_report.json")
 ```
 
 ---
@@ -158,7 +158,7 @@ mlflow.log_dict(json.loads(report.model_dump_json()), "jury_eval_report.json")
 ## Pattern 3 — Endpoint comparison
 
 ```python
-from jury_eval import OpenAIBackend, Variant
+from judge_kappa import OpenAIBackend, Variant
 
 ctrl = Variant(name="gpt-4o-mini", generation_backend=OpenAIBackend("gpt-4o-mini"))
 trt  = Variant(name="gpt-4o",      generation_backend=OpenAIBackend("gpt-4o"))
@@ -196,7 +196,7 @@ report = evaluator.evaluate_prerecorded(
 ## Pattern 5 — Pairwise preference
 
 ```python
-from jury_eval import PairwiseJudge, AnthropicBackend
+from judge_kappa import PairwiseJudge, AnthropicBackend
 
 pairwise_judge = PairwiseJudge("pairwise", AnthropicBackend("claude-sonnet-4-6"))
 
@@ -219,7 +219,7 @@ print(f"Ties:               {report.tie_rate:.1%}")
 ## Pattern 6 — Tournament (N systems)
 
 ```python
-from jury_eval import TournamentEvaluator, PairwiseJudge, AnthropicBackend, Variant, OpenAIBackend
+from judge_kappa import TournamentEvaluator, PairwiseJudge, AnthropicBackend, Variant, OpenAIBackend
 
 tournament = TournamentEvaluator(
     pairwise_judge=PairwiseJudge("judge", AnthropicBackend("claude-sonnet-4-6")),
@@ -255,7 +255,7 @@ print(report.win_matrix["gpt-4o"]["gpt-4o-mini"])  # win rate of gpt-4o over gpt
 ## Pattern 7 — Adding bias detection
 
 ```python
-from jury_eval import PairwiseJudge
+from judge_kappa import PairwiseJudge
 
 pairwise = PairwiseJudge("bias-detector", AnthropicBackend("claude-sonnet-4-6"))
 
@@ -279,7 +279,7 @@ if report.bias.verbosity_biased:
 ## Pattern 8 — Local models (vLLM / Ollama)
 
 ```python
-from jury_eval import OpenAIBackend, AssertionJudge
+from judge_kappa import OpenAIBackend, AssertionJudge
 
 # vLLM — no auth
 vllm_backend = OpenAIBackend(

@@ -3,9 +3,9 @@
 Each example has a ready-to-run config file in `examples/`. Run any of them with:
 
 ```bash
-jury-eval validate examples/<config>.yaml   # check config before running
-jury-eval run examples/<config>.yaml        # run with text output (default)
-jury-eval run examples/<config>.yaml --format json --output report.json
+judge-kappa validate examples/<config>.yaml   # check config before running
+judge-kappa run examples/<config>.yaml        # run with text output (default)
+judge-kappa run examples/<config>.yaml --format json --output report.json
 ```
 
 ---
@@ -18,11 +18,11 @@ jury-eval run examples/<config>.yaml --format json --output report.json
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
-jury-eval run examples/config_skill_minimal.yaml
+judge-kappa run examples/config_skill_minimal.yaml
 ```
 
 ```
-=== JuryEval Report ===
+=== judge-kappa Report ===
 Cases:              3
 Mean uplift:        +0.310   (treatment − control)
 Control score:      0.450
@@ -49,7 +49,7 @@ Bias diagnostics:
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 export OPENAI_API_KEY="sk-..."
-jury-eval run examples/config_skill.yaml
+judge-kappa run examples/config_skill.yaml
 ```
 
 ```
@@ -73,7 +73,7 @@ Expected P(e):     0.334
 **Produces:** `EvalReport`. Note: α will be low — that is expected when using a JudgeJury (diverse rubrics).
 
 ```bash
-jury-eval run examples/config_dataset.yaml
+judge-kappa run examples/config_dataset.yaml
 ```
 
 ---
@@ -85,7 +85,7 @@ jury-eval run examples/config_dataset.yaml
 **Produces:** `EvalReport`. Per-case α identifies which specific cases divided the judges.
 
 ```bash
-jury-eval run examples/config_dataset_panel.yaml
+judge-kappa run examples/config_dataset_panel.yaml
 ```
 
 If α < 0.67, look at the `per-case α` column in the output — low-α cases reveal where the rubric wording is ambiguous.
@@ -101,7 +101,7 @@ If α < 0.67, look at the `per-case α` column in the output — low-α cases re
 ```bash
 export OPENAI_API_KEY="sk-..."
 export ANTHROPIC_API_KEY="sk-ant-..."
-jury-eval run examples/config_endpoints.yaml
+judge-kappa run examples/config_endpoints.yaml
 ```
 
 Python API equivalent:
@@ -120,7 +120,7 @@ report = evaluator.evaluate_endpoints(cases, ctrl, trt)
 **Dataset format:** `{"output_control": "...", "output_treatment": "..."}`
 
 ```bash
-jury-eval run examples/config_prerecorded.yaml
+judge-kappa run examples/config_prerecorded.yaml
 ```
 
 Python API equivalent:
@@ -142,11 +142,11 @@ report = evaluator.evaluate_prerecorded(
 **Produces:** `PairwiseReport` with preference rates, tie rate, positional bias rate.
 
 ```bash
-jury-eval run examples/config_pairwise.yaml
+judge-kappa run examples/config_pairwise.yaml
 ```
 
 ```
-=== JuryEval Pairwise Report ===
+=== judge-kappa Pairwise Report ===
 System A: gpt-4o-mini    preferred: 27.0%  mean score: 0.612
 System B: gpt-4o         preferred: 68.0%  mean score: 0.821
 Ties:                               5.0%
@@ -174,7 +174,7 @@ print(f"System B preferred: {report.preference_rate_b:.1%}")
 **Key settings:** `positional_judge` enabled, `verbosity_bias_threshold: 0.25` (stricter), `include_verdicts: true` (full audit trail).
 
 ```bash
-jury-eval run examples/config_regulatory.yaml --format json --verdicts --output audit-report.json
+judge-kappa run examples/config_regulatory.yaml --format json --verdicts --output audit-report.json
 ```
 
 Key output fields for regulatory evidence:
@@ -213,7 +213,7 @@ Key output fields for regulatory evidence:
 export ANTHROPIC_API_KEY="sk-ant-..."
 export OPENROUTER_API_KEY="sk-or-..."
 # No keys needed for vLLM and Ollama (api_key_env: "")
-jury-eval run examples/config_mixed_panel.yaml
+judge-kappa run examples/config_mixed_panel.yaml
 ```
 
 See [docs/05-key-management.md](05-key-management.md) for the `api_key_env` field documentation.

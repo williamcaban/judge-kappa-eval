@@ -17,9 +17,9 @@ import json
 
 import pytest
 
-from jury_eval.judges.pairwise import PairwiseJudge
-from jury_eval.models import EvalCase, Variant
-from jury_eval.tournament import (
+from judge_kappa.judges.pairwise import PairwiseJudge
+from judge_kappa.models import EvalCase, Variant
+from judge_kappa.tournament import (
     TournamentEvaluator,
     _compute_elo,
 )

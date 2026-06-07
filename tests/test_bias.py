@@ -10,10 +10,10 @@ import json
 
 import pytest
 
-from jury_eval.bias.positional import PositionalBiasDetector, PositionalBiasReport
-from jury_eval.bias.verbosity import VerbosityBiasDetector
-from jury_eval.judges.pairwise import PairwiseJudge
-from jury_eval.models import EvalCase
+from judge_kappa.bias.positional import PositionalBiasDetector, PositionalBiasReport
+from judge_kappa.bias.verbosity import VerbosityBiasDetector
+from judge_kappa.judges.pairwise import PairwiseJudge
+from judge_kappa.models import EvalCase
 from tests.conftest import MockLLMBackend, make_verdict
 
 

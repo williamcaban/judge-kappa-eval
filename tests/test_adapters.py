@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from jury_eval.adapters.dataset import DatasetAdapter
-from jury_eval.adapters.skill import SkillAdapter
+from judge_kappa.adapters.dataset import DatasetAdapter
+from judge_kappa.adapters.skill import SkillAdapter
 
 
 # ── SkillAdapter ──────────────────────────────────────────────────────────────

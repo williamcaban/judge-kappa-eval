@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
-from jury_eval.cli.builder import _resolve_api_key
+from judge_kappa.cli.builder import _resolve_api_key
 
 
 class TestResolveApiKey:

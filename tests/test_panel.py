@@ -10,10 +10,10 @@ import json
 
 import pytest
 
-from jury_eval.judges.assertion import AssertionJudge
-from jury_eval.models import AggregationStrategy, Assertion, EvalCase, JudgeVerdict
-from jury_eval.panel.jury import JudgeJury
-from jury_eval.panel.panel import JudgePanel
+from judge_kappa.judges.assertion import AssertionJudge
+from judge_kappa.models import AggregationStrategy, Assertion, EvalCase, JudgeVerdict
+from judge_kappa.panel.jury import JudgeJury
+from judge_kappa.panel.panel import JudgePanel
 from tests.conftest import MockLLMBackend, make_verdict
 
 

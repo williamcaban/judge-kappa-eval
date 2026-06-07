@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "jury-eval"
+name = "judge-kappa"
 version = "0.1.0"
 description = "Unified LLM evaluation: A/B uplift, Panel/Jury judges, Krippendorff α, Cohen κ, pairwise preference, Elo tournament, and bias detection"
 readme = { file = "README.md", content-type = "text/markdown" }
@@ -43,19 +43,19 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage      = "https://github.com/williamcaban/JuryEval"
-Repository    = "https://github.com/williamcaban/JuryEval"
-Documentation = "https://github.com/williamcaban/JuryEval/tree/main/docs"
-Issues        = "https://github.com/williamcaban/JuryEval/issues"
-Changelog     = "https://github.com/williamcaban/JuryEval/blob/main/CHANGELOG.md"
+Homepage      = "https://github.com/williamcaban/judge-kappa"
+Repository    = "https://github.com/williamcaban/judge-kappa"
+Documentation = "https://github.com/williamcaban/judge-kappa/tree/main/docs"
+Issues        = "https://github.com/williamcaban/judge-kappa/issues"
+Changelog     = "https://github.com/williamcaban/judge-kappa/blob/main/CHANGELOG.md"
 
 [project.scripts]
-jury-eval = "jury_eval.cli.main:app"
+judge-kappa = "judge_kappa.cli.main:app"
 
 [project.optional-dependencies]
 openai    = ["openai>=1.30"]
 anthropic = ["anthropic>=0.28"]
-all       = ["jury-eval[openai,anthropic]"]
+all       = ["judge-kappa[openai,anthropic]"]
 
 # uv-native dev dependencies (uv sync --group dev)
 [dependency-groups]
@@ -67,7 +67,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/jury_eval"]
+packages = ["src/judge_kappa"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -98,10 +98,10 @@ strict              = true
 ignore_missing_imports = true
 
 [tool.coverage.run]
-source = ["src/jury_eval"]
+source = ["src/judge_kappa"]
 omit   = [
-    "src/jury_eval/llm/openai_backend.py",
-    "src/jury_eval/llm/anthropic_backend.py",
+    "src/judge_kappa/llm/openai_backend.py",
+    "src/judge_kappa/llm/anthropic_backend.py",
 ]
 
 [tool.coverage.report]

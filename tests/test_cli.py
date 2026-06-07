@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pytest
 import yaml
 
-from jury_eval.cli.config_schema import DatasetModeConfig, SkillModeConfig
+from judge_kappa.cli.config_schema import DatasetModeConfig, SkillModeConfig
 
 
 # ── Config schema validation ──────────────────────────────────────────────────
@@ -132,7 +132,7 @@ class TestCLIValidateCommand:
         captured = StringIO()
         with patch("sys.argv", ["jury-eval", "validate", str(config_path)]):
             with patch("sys.stdout", captured):
-                from jury_eval.cli.main import app
+                from judge_kappa.cli.main import app
                 app()
         assert "valid" in captured.getvalue()
 
@@ -142,7 +142,7 @@ class TestCLIValidateCommand:
         config_path.write_text(yaml.dump(bad_config))
         with patch("sys.argv", ["jury-eval", "validate", str(config_path)]):
             with pytest.raises(SystemExit) as exc:
-                from jury_eval.cli.main import app
+                from judge_kappa.cli.main import app
                 app()
         assert exc.value.code != 0
 
@@ -150,7 +150,7 @@ class TestCLIValidateCommand:
 class TestCLISchemaCommand:
     def test_schema_outputs_valid_json(self, capsys):
         with patch("sys.argv", ["jury-eval", "schema"]):
-            from jury_eval.cli.main import app
+            from judge_kappa.cli.main import app
             app()
         captured = capsys.readouterr()
         parsed = json.loads(captured.out)
@@ -159,7 +159,7 @@ class TestCLISchemaCommand:
 
     def test_skill_schema_has_required_fields(self, capsys):
         with patch("sys.argv", ["jury-eval", "schema"]):
-            from jury_eval.cli.main import app
+            from judge_kappa.cli.main import app
             app()
         schema = json.loads(capsys.readouterr().out)
         skill_props = schema["skill_mode"].get("properties", {})
@@ -171,7 +171,7 @@ class TestCLISchemaCommand:
 class TestCLIHelpAndErrors:
     def test_no_args_shows_help(self, capsys):
         with patch("sys.argv", ["jury-eval"]):
-            from jury_eval.cli.main import app
+            from judge_kappa.cli.main import app
             app()
         out = capsys.readouterr().out
         assert "Usage" in out
@@ -179,14 +179,14 @@ class TestCLIHelpAndErrors:
     def test_unknown_command_exits(self):
         with patch("sys.argv", ["jury-eval", "unknown-cmd"]):
             with pytest.raises(SystemExit) as exc:
-                from jury_eval.cli.main import app
+                from judge_kappa.cli.main import app
                 app()
         assert exc.value.code != 0
 
     def test_run_missing_config_arg_exits(self):
         with patch("sys.argv", ["jury-eval", "run"]):
             with pytest.raises(SystemExit) as exc:
-                from jury_eval.cli.main import app
+                from judge_kappa.cli.main import app
                 app()
         assert exc.value.code != 0
 
@@ -195,6 +195,6 @@ class TestCLIHelpAndErrors:
         config_path.write_text(yaml.dump(MINIMAL_SKILL_CONFIG))
         with patch("sys.argv", ["jury-eval", "run", str(config_path), "--format", "xml"]):
             with pytest.raises(SystemExit) as exc:
-                from jury_eval.cli.main import app
+                from judge_kappa.cli.main import app
                 app()
         assert exc.value.code != 0

@@ -1,4 +1,4 @@
-# jury-eval config — minimal skill evaluation
+# judge-kappa config — minimal skill evaluation
 #
 # The simplest possible configuration: one judge, no bias detection.
 # Use this to get started quickly or when you only have one API key.
@@ -9,8 +9,8 @@
 #   → does NOT detect positional or verbosity bias
 #
 # Run:
-#   jury-eval run examples/config_skill_minimal.yaml
-#   jury-eval run examples/config_skill_minimal.yaml --format json --output report.json
+#   judge-kappa run examples/config_skill_minimal.yaml
+#   judge-kappa run examples/config_skill_minimal.yaml --format json --output report.json
 #
 # Required env vars:
 #   ANTHROPIC_API_KEY

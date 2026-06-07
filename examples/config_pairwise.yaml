@@ -1,4 +1,4 @@
-# jury-eval config — pairwise pre-recorded evaluation
+# judge-kappa config — pairwise pre-recorded evaluation
 #
 # Evaluates pre-recorded A/B output pairs using a PairwiseJudge.
 # Returns PairwiseReport (preference rates) instead of EvalReport (uplift).
@@ -30,7 +30,7 @@
 #   mean_score_b       — mean score assigned to B across all cases
 #
 # Run:
-#   jury-eval run examples/config_pairwise.yaml
+#   judge-kappa run examples/config_pairwise.yaml
 #
 # Note: pairwise mode is CLI-mode "pairwise". It uses only the pairwise_judge
 # section; the panel section and generation backend are not used.

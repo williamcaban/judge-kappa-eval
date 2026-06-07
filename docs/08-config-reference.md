@@ -3,8 +3,8 @@
 All CLI runs are driven by a YAML config file. Print the full JSON Schema with:
 
 ```bash
-jury-eval schema
-jury-eval schema | jq '.skill_mode.properties'
+judge-kappa schema
+judge-kappa schema | jq '.skill_mode.properties'
 ```
 
 ---

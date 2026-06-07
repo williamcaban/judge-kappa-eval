@@ -1,17 +1,17 @@
 # CLI Reference
 
-The `jury-eval` command is installed as a script entry point when you `pip install` or `uv sync` the package.
+The `judge-kappa` command is installed as a script entry point when you `pip install` or `uv sync` the package.
 
 ---
 
 ## Commands
 
-### `jury-eval run`
+### `judge-kappa run`
 
 Run an evaluation from a YAML config file.
 
 ```bash
-jury-eval run <config.yaml> [OPTIONS]
+judge-kappa run <config.yaml> [OPTIONS]
 ```
 
 | Option | Default | Description |
@@ -24,33 +24,33 @@ jury-eval run <config.yaml> [OPTIONS]
 
 ```bash
 # Human-readable output to stdout
-jury-eval run examples/config_skill.yaml
+judge-kappa run examples/config_skill.yaml
 
 # JSON report to file
-jury-eval run examples/config_skill.yaml --format json --output report.json
+judge-kappa run examples/config_skill.yaml --format json --output report.json
 
 # JSON with full per-judge per-case verdict detail
-jury-eval run examples/config_skill.yaml --format json --verdicts --output report.json
+judge-kappa run examples/config_skill.yaml --format json --verdicts --output report.json
 
 # JSONL — one case per line; good for large corpora or streaming
-jury-eval run examples/config_skill.yaml --format jsonl | jq '.uplift'
+judge-kappa run examples/config_skill.yaml --format jsonl | jq '.uplift'
 
 # Write to file (overrides output.file in config)
-jury-eval run examples/config_skill.yaml --output report.txt
+judge-kappa run examples/config_skill.yaml --output report.txt
 ```
 
 ---
 
-### `jury-eval validate`
+### `judge-kappa validate`
 
 Validate a config file without running evaluation. Checks schema, required fields, and `api_key_env` variable names (but does not verify the keys are set).
 
 ```bash
-jury-eval validate <config.yaml>
+judge-kappa validate <config.yaml>
 ```
 
 ```bash
-jury-eval validate examples/config_skill.yaml
+judge-kappa validate examples/config_skill.yaml
 # ✓ Config valid: examples/config_skill.yaml
 ```
 
@@ -58,7 +58,7 @@ Exit code `0` on success, non-zero on failure.
 
 ---
 
-### `jury-eval schema`
+### `judge-kappa schema`
 
 Print the full JSON Schema for both config modes (`skill` and `dataset`) to stdout. Useful for:
 - Editor autocomplete (paste into your `.vscode/settings.json` YAML schema mapping)
@@ -66,18 +66,18 @@ Print the full JSON Schema for both config modes (`skill` and `dataset`) to stdo
 - Understanding every field and its allowed values
 
 ```bash
-jury-eval schema
-jury-eval schema | jq '.skill_mode.properties.panel'
+judge-kappa schema
+judge-kappa schema | jq '.skill_mode.properties.panel'
 ```
 
 ---
 
-### `jury-eval --help`
+### `judge-kappa --help`
 
 Print usage summary.
 
 ```bash
-jury-eval --help
+judge-kappa --help
 ```
 
 ---
@@ -89,7 +89,7 @@ jury-eval --help
 Human-readable report to stdout.
 
 ```
-=== JuryEval Report ===
+=== judge-kappa Report ===
 Cases:              3
 Mean uplift:        +0.234   (treatment − control)
 Control score:      0.512
@@ -119,7 +119,7 @@ Full `EvalReport` serialized as pretty-printed JSON. Compatible with MLflow arti
 Per-judge per-case verdicts are excluded by default (add `--verdicts` to include them).
 
 ```bash
-jury-eval run config.yaml --format json | python3 -c "
+judge-kappa run config.yaml --format json | python3 -c "
 import json, sys
 r = json.load(sys.stdin)
 print(f'uplift: {r[\"mean_uplift\"]:+.3f}')
@@ -132,7 +132,7 @@ print(f'alpha:  {r[\"agreement\"][\"alpha\"]:.3f}')
 One `CaseResult` JSON object per line. Useful for streaming large corpora or piping individual cases into other tools.
 
 ```bash
-jury-eval run config.yaml --format jsonl \
+judge-kappa run config.yaml --format jsonl \
   | jq 'select(.uplift > 0.3) | .case_id'
 ```
 
@@ -146,7 +146,7 @@ When `--verdicts` is set, each `CaseResult` in the JSON output includes the full
 - Computing custom aggregations over judge verdicts
 
 ```bash
-jury-eval run examples/config_regulatory.yaml \
+judge-kappa run examples/config_regulatory.yaml \
   --format json --verdicts --output audit-report.json
 ```
 
@@ -175,14 +175,14 @@ The `verdicts` field on each case:
 
 ```bash
 # Fail CI if config is invalid
-jury-eval validate examples/config_skill.yaml || exit 1
+judge-kappa validate examples/config_skill.yaml || exit 1
 
 # Validate all configs
 for f in examples/config_*.yaml; do
-    jury-eval validate "$f" || exit 1
+    judge-kappa validate "$f" || exit 1
 done
 
 # JSON Schema validation with check-jsonschema
-jury-eval schema > jury-eval-schema.json
-check-jsonschema --schemafile jury-eval-schema.json examples/config_skill.yaml
+judge-kappa schema > judge-kappa-schema.json
+check-jsonschema --schemafile judge-kappa-schema.json examples/config_skill.yaml
 ```

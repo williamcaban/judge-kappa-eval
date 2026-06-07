@@ -117,7 +117,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 export OPENROUTER_API_KEY="sk-or-..."
 # No keys needed for vLLM and Ollama
 
-jury-eval run examples/config_mixed_panel.yaml
+judge-kappa run examples/config_mixed_panel.yaml
 ```
 
 This works identically for `panel`, `jury`, and the `positional_judge` field — each backend resolves its own key.
@@ -130,7 +130,7 @@ In the Python API, pass the key directly to the backend constructor. No `api_key
 
 ```python
 import os
-from jury_eval import OpenAIBackend, AnthropicBackend, AssertionJudge, JudgePanel
+from judge_kappa import OpenAIBackend, AnthropicBackend, AssertionJudge, JudgePanel
 
 panel = JudgePanel(judges=[
     # Anthropic — picks up ANTHROPIC_API_KEY automatically

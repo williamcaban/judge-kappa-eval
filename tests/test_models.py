@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from jury_eval.models import (
+from judge_kappa.models import (
     AggregationStrategy,
     Assertion,
     EvalCase,

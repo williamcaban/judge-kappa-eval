@@ -1,8 +1,8 @@
-# jury-eval config — skill mode (agent-skills-eval compatible)
+# judge-kappa config — skill mode (agent-skills-eval compatible)
 #
-# Run:  jury-eval run config_skill.yaml
-#       jury-eval run config_skill.yaml --format json --output report.json
-#       jury-eval run config_skill.yaml --format jsonl | mlflow ...
+# Run:  judge-kappa run config_skill.yaml
+#       judge-kappa run config_skill.yaml --format json --output report.json
+#       judge-kappa run config_skill.yaml --format jsonl | mlflow ...
 #
 # Required env vars:
 #   ANTHROPIC_API_KEY

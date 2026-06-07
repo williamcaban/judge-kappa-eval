@@ -13,7 +13,7 @@ import json
 
 import pytest
 
-from jury_eval.models import (
+from judge_kappa.models import (
     Assertion,
     CalibrationExample,
     EvalCase,

@@ -42,7 +42,7 @@ Field names are configurable via `output_a_field` and `output_b_field`.
 ### Python API
 
 ```python
-from jury_eval import JuryEvaluator, PairwiseJudge, AnthropicBackend
+from judge_kappa import JuryEvaluator, PairwiseJudge, AnthropicBackend
 
 evaluator = JuryEvaluator(panel=my_panel, generation_backend=my_backend)
 judge = PairwiseJudge("claude-pairwise", AnthropicBackend("claude-sonnet-4-6"))
@@ -117,7 +117,7 @@ for case in report.cases:
 
 **Comparing callables (RAG pipelines, LangChain chains, etc.):**
 ```python
-from jury_eval import TournamentEvaluator, PairwiseJudge, AnthropicBackend
+from judge_kappa import TournamentEvaluator, PairwiseJudge, AnthropicBackend
 
 tournament = TournamentEvaluator(
     pairwise_judge=PairwiseJudge("judge", AnthropicBackend("claude-sonnet-4-6")),
@@ -137,7 +137,7 @@ report = tournament.run_dataset(
 
 **Comparing live endpoints:**
 ```python
-from jury_eval import OpenAIBackend, Variant
+from judge_kappa import OpenAIBackend, Variant
 
 report = tournament.run_endpoints(
     cases=eval_cases,
@@ -218,7 +218,7 @@ Options:
 Full round-robin becomes expensive past N=6. Instead, run each challenger only against the current champion.
 
 ```python
-from jury_eval import JuryEvaluator, PairwiseJudge, AnthropicBackend
+from judge_kappa import JuryEvaluator, PairwiseJudge, AnthropicBackend
 
 evaluator = JuryEvaluator(panel=my_panel, generation_backend=my_backend)
 pairwise_judge = PairwiseJudge("judge", AnthropicBackend("claude-sonnet-4-6"))

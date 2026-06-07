@@ -1,4 +1,4 @@
-# jury-eval config — mixed-provider panel
+# judge-kappa config — mixed-provider panel
 #
 # Four judges from four different providers in a single panel:
 #   - Anthropic (claude-sonnet)     → api_key_env absent   → reads ANTHROPIC_API_KEY
@@ -20,8 +20,8 @@
 # Run:
 #   export ANTHROPIC_API_KEY="sk-ant-..."
 #   export OPENROUTER_API_KEY="sk-or-..."
-#   jury-eval run examples/config_mixed_panel.yaml
-#   jury-eval run examples/config_mixed_panel.yaml --format json --output report.json
+#   judge-kappa run examples/config_mixed_panel.yaml
+#   judge-kappa run examples/config_mixed_panel.yaml --format json --output report.json
 
 mode: skill
 skill_dir: ./my-skill

@@ -12,15 +12,15 @@ import json
 
 import pytest
 
-from jury_eval.evaluator import JuryEvaluator
-from jury_eval.judges.assertion import AssertionJudge
-from jury_eval.models import (
+from judge_kappa.evaluator import JuryEvaluator
+from judge_kappa.judges.assertion import AssertionJudge
+from judge_kappa.models import (
     Assertion,
     EvalCase,
     ScaleType,
     Variant,
 )
-from jury_eval.panel.panel import JudgePanel
+from judge_kappa.panel.panel import JudgePanel
 from tests.conftest import MockLLMBackend
 
 
@@ -171,7 +171,7 @@ class TestEvaluateEndpoints:
         assert len(report.cases) == 3
 
     def test_returns_eval_report(self):
-        from jury_eval.models import EvalReport
+        from judge_kappa.models import EvalReport
         cases = [_make_case("c1", ["A"])]
         ev, _ = _make_evaluator([_assertion_resp({"A": 0.8})], n_judges=1)
         ctrl = Variant(name="a", predict_fn=lambda _: "a output")
@@ -215,8 +215,8 @@ class TestEvaluatePrerecorded:
                 calls.append("called")
                 return "generated"
 
-        from jury_eval.judges.assertion import AssertionJudge
-        from jury_eval.panel.panel import JudgePanel
+        from judge_kappa.judges.assertion import AssertionJudge
+        from judge_kappa.panel.panel import JudgePanel
 
         gen_backend = TrackingBackend()
         judge_backend = MockLLMBackend(responses=[_assertion_resp({"A": 0.8})] * 50)
@@ -249,8 +249,8 @@ class TestEvaluatePairwiseDataset:
         return json.dumps({"score_a": score_a, "score_b": score_b, "preferred": preferred, "rationale": "ok"})
 
     def test_returns_pairwise_report(self):
-        from jury_eval.judges.pairwise import PairwiseJudge
-        from jury_eval.models import PairwiseReport
+        from judge_kappa.judges.pairwise import PairwiseJudge
+        from judge_kappa.models import PairwiseReport
 
         data = [
             {"id": "p1", "prompt": "Q1", "output_a": "System A text", "output_b": "System B text"},
@@ -266,7 +266,7 @@ class TestEvaluatePairwiseDataset:
         assert len(report.cases) == 2
 
     def test_preference_rate_sums_to_one(self):
-        from jury_eval.judges.pairwise import PairwiseJudge
+        from judge_kappa.judges.pairwise import PairwiseJudge
 
         data = [{"id": f"p{i}", "prompt": "Q", "output_a": "A", "output_b": "B"} for i in range(5)]
         backend = MockLLMBackend(responses=[self._pairwise_resp(0.8, 0.4)] * 50)
@@ -278,7 +278,7 @@ class TestEvaluatePairwiseDataset:
         assert abs(total - 1.0) < 0.01
 
     def test_labels_in_report(self):
-        from jury_eval.judges.pairwise import PairwiseJudge
+        from judge_kappa.judges.pairwise import PairwiseJudge
 
         data = [{"id": "p1", "prompt": "Q", "output_a": "A text", "output_b": "B text"}]
         backend = MockLLMBackend(responses=[self._pairwise_resp(0.7, 0.5)] * 20)
@@ -292,7 +292,7 @@ class TestEvaluatePairwiseDataset:
         assert report.label_b == "Baseline"
 
     def test_high_score_a_gives_high_preference_rate_a(self):
-        from jury_eval.judges.pairwise import PairwiseJudge
+        from judge_kappa.judges.pairwise import PairwiseJudge
 
         data = [{"id": f"p{i}", "prompt": "Q", "output_a": "A", "output_b": "B"} for i in range(10)]
         # A always scores higher

@@ -1,4 +1,4 @@
-# jury-eval config — regulatory / compliance evaluation
+# judge-kappa config — regulatory / compliance evaluation
 #
 # Use this when evaluation scores must serve as evidence in a compliance review,
 # security audit, or regulatory submission (EU AI Act, FedRAMP, ISO 42001, etc.).
@@ -18,7 +18,7 @@
 #   alpha >= 0.80                  — required for formal quantitative claims
 #
 # Run:
-#   jury-eval run examples/config_regulatory.yaml --format json --verdicts --output audit-report.json
+#   judge-kappa run examples/config_regulatory.yaml --format json --verdicts --output audit-report.json
 #
 # Required env vars:
 #   ANTHROPIC_API_KEY

@@ -16,10 +16,10 @@ import json
 
 import pytest
 
-from jury_eval.judges.assertion import AssertionJudge
-from jury_eval.judges.pairwise import PairwiseJudge
-from jury_eval.judges.rubric import RubricJudge
-from jury_eval.models import Assertion, EvalCase
+from judge_kappa.judges.assertion import AssertionJudge
+from judge_kappa.judges.pairwise import PairwiseJudge
+from judge_kappa.judges.rubric import RubricJudge
+from judge_kappa.models import Assertion, EvalCase
 from tests.conftest import MockLLMBackend
 
 
