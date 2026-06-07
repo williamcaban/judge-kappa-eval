@@ -1,0 +1,86 @@
+# jury-eval config — pre-recorded outputs (no generation model called)
+#
+# Use when you already have the outputs from both systems and want to
+# score them without calling any generation model. Typical scenarios:
+#
+#   - You captured outputs from a production system before and after a change
+#   - You ran two LLMs via another pipeline and want to evaluate the results
+#   - You have a test set with golden outputs to score
+#   - Speed / cost: no generation calls, only judge calls
+#
+# Dataset row format (two pre-recorded variants):
+#   {
+#     "id": "q001",
+#     "inputs": { "question": "What is RAG?" },
+#     "output_control":   "RAG stands for Retrieval-Augmented Generation...",
+#     "output_treatment": "Retrieval-Augmented Generation (RAG) is a technique...",
+#     "expectations":     { "answer": "RAG combines retrieval with generation." }
+#   }
+#
+# Alternative (single pre-recorded output, same output scored for both variants):
+#   {
+#     "id": "q001",
+#     "inputs": { "question": "What is RAG?" },
+#     "output": "RAG stands for ...",
+#     "expectations": { "answer": "..." }
+#   }
+#
+# Run:
+#   jury-eval run examples/config_prerecorded.yaml
+#
+# Required env vars:
+#   ANTHROPIC_API_KEY      — for judges only; no generation model is called
+
+mode: dataset
+dataset_file: ./prerecorded_evals.jsonl
+
+# ── Generation backend ────────────────────────────────────────────────────────
+# Required field in the config schema, but NOT CALLED in prerecorded mode.
+# Outputs come directly from the dataset rows, not from any model.
+generation:
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+
+# ── Variants ──────────────────────────────────────────────────────────────────
+# Names must match the field suffix in the dataset rows:
+#   control   → reads "output_control" field
+#   treatment → reads "output_treatment" field
+# (configurable via control_output_field / treatment_output_field in Python API)
+
+control:
+  name: control
+  prerecorded: true              # signals: read output from dataset, don't call model
+  prerecorded_field: output_control
+
+treatment:
+  name: treatment
+  prerecorded: true
+  prerecorded_field: output_treatment
+
+panel:
+  type: panel
+  strategy: mean
+  judges:
+    - id: judge-claude
+      type: rubric
+      backend:
+        provider: anthropic
+        model: claude-sonnet-4-6
+      rubric:
+        - name: faithfulness
+          description: Claims are grounded in the provided context.
+          weight: 2.0
+        - name: answer_relevance
+          description: Output directly addresses the user's question.
+          weight: 1.5
+        - name: no_hallucination
+          description: No fabricated facts.
+          weight: 3.0
+
+scale_type: interval
+verbosity_bias_threshold: 0.30
+
+output:
+  format: text
+  include_verdicts: false

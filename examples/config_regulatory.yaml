@@ -1,0 +1,144 @@
+# jury-eval config — regulatory / compliance evaluation
+#
+# Use this when evaluation scores must serve as evidence in a compliance review,
+# security audit, or regulatory submission (EU AI Act, FedRAMP, ISO 42001, etc.).
+#
+# Decision guide: full bias detection + strict agreement thresholds
+#   → positional_judge: detects A/B order effects (required for pairwise claims)
+#   → verbosity_bias_threshold: 0.25 (stricter than default 0.30)
+#   → scale_type: interval (score differences are treated as meaningful)
+#   → include_verdicts: true (full per-judge rationale logged for audit trail)
+#   → --format json --output audit-report.json (structured artifact for submission)
+#
+# Acceptance thresholds for regulatory use:
+#   positional_bias_rate < 0.15   — above this, find a less biased judge
+#   verbosity_biased: false        — required; if true, control for length
+#   expected_chance_agreement < 0.50  — judges aren't guessing the modal category
+#   alpha >= 0.67                  — minimum for tentative conclusions
+#   alpha >= 0.80                  — required for formal quantitative claims
+#
+# Run:
+#   jury-eval run examples/config_regulatory.yaml --format json --verdicts --output audit-report.json
+#
+# Required env vars:
+#   ANTHROPIC_API_KEY
+#   OPENAI_API_KEY
+
+mode: skill
+skill_dir: ./my-skill
+
+generation:
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+
+control:
+  name: control
+  temperature: 0.0
+
+treatment:
+  name: treatment
+  temperature: 0.0
+
+# ── Three-judge panel for agreement evidence ──────────────────────────────────
+# Using three judges from two different providers reduces provider-specific bias.
+# ICL calibration is mandatory here — calibration anchors ground all judges on
+# the same human-validated reference scale, which raises α and κ.
+
+panel:
+  type: panel
+  strategy: mean
+  judges:
+
+    - id: judge-claude-sonnet
+      type: assertion
+      backend:
+        provider: anthropic
+        model: claude-sonnet-4-6
+      weight: 1.0
+      temperature: 0.0
+      calibration:
+        - prompt: "Identify all security vulnerabilities in this code snippet."
+          output: "There is a vulnerability."
+          score: 0.1
+          rationale: "Fails to name the vulnerability type, location, or severity — unactionable."
+        - prompt: "Identify all security vulnerabilities in this code snippet."
+          output: "Line 12 uses os.system() with unsanitized user input, enabling command injection (CWE-78). Line 34 logs the plaintext password to stdout."
+          score: 0.95
+          rationale: "Names both vulnerabilities with location, type, and CWE reference."
+
+    - id: judge-gpt4
+      type: assertion
+      backend:
+        provider: openai
+        model: gpt-4o
+      weight: 1.0
+      temperature: 0.0
+      calibration:
+        - prompt: "Identify all security vulnerabilities in this code snippet."
+          output: "There is a vulnerability."
+          score: 0.1
+          rationale: "Fails to name the vulnerability type, location, or severity — unactionable."
+        - prompt: "Identify all security vulnerabilities in this code snippet."
+          output: "Line 12 uses os.system() with unsanitized user input, enabling command injection (CWE-78). Line 34 logs the plaintext password to stdout."
+          score: 0.95
+          rationale: "Names both vulnerabilities with location, type, and CWE reference."
+
+    - id: judge-claude-haiku
+      type: assertion
+      backend:
+        provider: anthropic
+        model: claude-haiku-4-5-20251001
+      weight: 1.0
+      temperature: 0.0
+      calibration:
+        - prompt: "Identify all security vulnerabilities in this code snippet."
+          output: "There is a vulnerability."
+          score: 0.1
+          rationale: "Fails to name the vulnerability type, location, or severity — unactionable."
+        - prompt: "Identify all security vulnerabilities in this code snippet."
+          output: "Line 12 uses os.system() with unsanitized user input, enabling command injection (CWE-78). Line 34 logs the plaintext password to stdout."
+          score: 0.95
+          rationale: "Names both vulnerabilities with location, type, and CWE reference."
+
+# ── Positional bias detection ─────────────────────────────────────────────────
+# Runs the A/B swap test for every case.
+# Each case gets two additional judge calls: once with (control=A, treatment=B)
+# and once with (control=B, treatment=A). A judge that always prefers position A
+# regardless of content is positionally biased.
+#
+# Cost: 2× additional calls per case for the positional judge only.
+# Report field: bias.positional_bias_rate (fraction of cases where position flipped)
+
+positional_judge:
+  id: positional-auditor
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+  temperature: 0.0
+  calibration:
+    - prompt: "Which summary is more accurate?"
+      output: "Summary A is slightly more detailed."
+      score: 0.6
+      rationale: "Reasonable preference but justification is weak."
+    - prompt: "Which summary is more accurate?"
+      output: "Summary B names all three causes while Summary A omits the third; B is more accurate."
+      score: 0.95
+      rationale: "Content-grounded preference with specific evidence."
+
+# ── Stricter bias and statistical thresholds ──────────────────────────────────
+# scale_type: interval — treat 0.7 and 0.8 as genuinely closer than 0.1 and 0.9.
+# verbosity_bias_threshold: 0.25 — stricter than default 0.30 for regulatory use.
+
+scale_type: interval
+verbosity_bias_threshold: 0.25
+
+# ── Output ────────────────────────────────────────────────────────────────────
+# include_verdicts: true — each judge's rationale is stored in the report,
+# providing an auditable record of why each score was assigned.
+# Recommended format: json for structured submission; use --output to write file.
+
+output:
+  format: json
+  file: audit-report.json
+  include_verdicts: true

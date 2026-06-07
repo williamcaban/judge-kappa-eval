@@ -1,0 +1,121 @@
+# jury-eval config — mixed-provider panel
+#
+# Four judges from four different providers in a single panel:
+#   - Anthropic (claude-sonnet)     → api_key_env absent   → reads ANTHROPIC_API_KEY
+#   - OpenRouter (gpt-4o via OR)    → api_key_env: "OPENROUTER_API_KEY"
+#   - vLLM local (llama 3.1)        → api_key_env: ""       → no auth required
+#   - Ollama local (mistral)        → api_key_env: ""       → no auth required
+#
+# Key resolution rules (api_key_env field):
+#   absent / null  →  use provider default (ANTHROPIC_API_KEY or OPENAI_API_KEY)
+#   "MY_VAR"       →  read from environment variable MY_VAR at runtime
+#   ""             →  no auth; passes placeholder "no-key" to the OpenAI client
+#
+# Required env vars for this config:
+#   ANTHROPIC_API_KEY       — for the Anthropic judge and the generation backend
+#   OPENROUTER_API_KEY      — for the OpenRouter judge
+#
+# No env var needed for vLLM or Ollama judges (api_key_env: "").
+#
+# Run:
+#   export ANTHROPIC_API_KEY="sk-ant-..."
+#   export OPENROUTER_API_KEY="sk-or-..."
+#   jury-eval run examples/config_mixed_panel.yaml
+#   jury-eval run examples/config_mixed_panel.yaml --format json --output report.json
+
+mode: skill
+skill_dir: ./my-skill
+
+generation:
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+    # api_key_env absent → reads ANTHROPIC_API_KEY automatically
+
+control:
+  name: control
+  temperature: 0.0
+
+treatment:
+  name: treatment
+  temperature: 0.0
+
+# ── Mixed-provider JudgePanel ─────────────────────────────────────────────────
+# All four judges use the same assertion list from evals.json.
+# Krippendorff's α across providers is a strong signal: if judges from
+# completely different model families agree, the evaluation is trustworthy.
+# If they disagree, the disagreement reveals genuine ambiguity in the assertions.
+
+panel:
+  type: panel
+  strategy: mean
+  judges:
+
+    # ── Judge 1: Anthropic (hosted) ───────────────────────────────────────────
+    # api_key_env absent → resolved from ANTHROPIC_API_KEY at runtime.
+    - id: judge-anthropic
+      type: assertion
+      backend:
+        provider: anthropic
+        model: claude-sonnet-4-6
+        # api_key_env: null  ← this is the default; omitting is equivalent
+      weight: 1.0
+      temperature: 0.0
+
+    # ── Judge 2: OpenRouter ───────────────────────────────────────────────────
+    # OpenRouter is OpenAI-compatible but uses its own API key.
+    # Set api_key_env to the name of the env var that holds your OR key.
+    # OpenRouter model names use the format: "provider/model-name"
+    - id: judge-openrouter-gpt4
+      type: assertion
+      backend:
+        provider: openai
+        model: openai/gpt-4o              # OpenRouter model identifier
+        base_url: https://openrouter.ai/api/v1
+        api_key_env: OPENROUTER_API_KEY   # reads OPENROUTER_API_KEY at runtime
+      weight: 1.0
+      temperature: 0.0
+
+    # ── Judge 3: vLLM local (no auth) ────────────────────────────────────────
+    # vLLM running locally without an API token.
+    # api_key_env: "" → passes "no-key" placeholder; the OpenAI client
+    # accepts any non-None string when base_url overrides the default.
+    - id: judge-vllm-llama
+      type: assertion
+      backend:
+        provider: openai
+        model: meta-llama/Meta-Llama-3.1-70B-Instruct
+        base_url: http://localhost:8000/v1
+        api_key_env: ""                   # no auth required
+      weight: 1.0
+      temperature: 0.0
+
+    # ── Judge 4: Ollama local (no auth) ──────────────────────────────────────
+    # Ollama exposes an OpenAI-compatible endpoint on port 11434.
+    # Ollama never requires an API key.
+    - id: judge-ollama-mistral
+      type: assertion
+      backend:
+        provider: openai
+        model: mistral                    # Ollama model name (from `ollama list`)
+        base_url: http://localhost:11434/v1
+        api_key_env: ""                   # no auth required
+      weight: 1.0
+      temperature: 0.0
+
+# ── Positional bias detection ─────────────────────────────────────────────────
+# Uses Anthropic for the pairwise judge — most reliable for structured output.
+positional_judge:
+  id: positional-auditor
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+    # api_key_env absent → reads ANTHROPIC_API_KEY
+  temperature: 0.0
+
+scale_type: ordinal
+verbosity_bias_threshold: 0.30
+
+output:
+  format: text
+  include_verdicts: false

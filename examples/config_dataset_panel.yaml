@@ -1,0 +1,169 @@
+# jury-eval config — dataset mode with homogeneous JudgePanel
+#
+# Use this when you want MLflow-compatible dataset evaluation AND need to
+# verify that all your judges read the rubric consistently before trusting scores.
+#
+# Decision guide: dataset mode + JudgePanel (same rubric for all judges)
+#   → answers "how good are these outputs?" with per-dimension scores
+#   → Krippendorff's α measures whether the rubric is unambiguous
+#   → high α (≥ 0.80) = rubric is clear, scores are trustworthy
+#   → low α (< 0.67) = rubric is ambiguous; examine per-case α to find which
+#     cases divide the judges, then tighten that rubric dimension or add ICL
+#
+# Contrast with config_dataset.yaml (JudgeJury):
+#   Panel = same rubric, measure agreement    ← this file
+#   Jury  = different rubrics, diverse views  ← config_dataset.yaml
+#
+# Run:
+#   jury-eval run examples/config_dataset_panel.yaml
+#   jury-eval run examples/config_dataset_panel.yaml --format json --output report.json
+#
+# Required env vars:
+#   ANTHROPIC_API_KEY
+#   OPENAI_API_KEY
+
+mode: dataset
+dataset_file: ./evals.jsonl       # JSONL or JSON array; see examples/evals.jsonl
+
+generation:
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+
+# Variants differ by system prompt — the dataset's predict_fn is not used here;
+# instead, the generation backend runs both variants directly.
+control:
+  name: baseline
+  system_prompt: "You are a helpful assistant. Answer concisely."
+  temperature: 0.0
+
+treatment:
+  name: grounded
+  system_prompt: |
+    You are a careful, evidence-grounded assistant.
+    Before answering: identify the key claim, check the context for evidence,
+    and answer only what the context supports. Flag gaps explicitly.
+  temperature: 0.0
+
+# ── Homogeneous JudgePanel ────────────────────────────────────────────────────
+# All judges share the SAME three rubric dimensions.
+# Krippendorff's α across these judges tells you whether the rubric is clear.
+# If α < 0.67, check per-case α in the report — low-α cases reveal which
+# rubric dimension is causing disagreement.
+
+panel:
+  type: panel
+  strategy: mean
+  judges:
+
+    - id: judge-claude
+      type: rubric
+      backend:
+        provider: anthropic
+        model: claude-sonnet-4-6
+      weight: 1.0
+      calibration:
+        - prompt: "What causes hallucination in LLMs?"
+          output: "LLMs hallucinate because they are trained on the internet."
+          score: 0.3
+          rationale: "Vague and partially wrong — ignores training distribution and decoding factors."
+        - prompt: "What causes hallucination in LLMs?"
+          output: "Hallucination occurs when the model's next-token probability distribution assigns high mass to plausible-sounding but factually unsupported tokens, often due to gaps in training data or overconfident decoding."
+          score: 0.92
+          rationale: "Technically accurate with specific mechanisms named."
+      rubric:
+        - name: faithfulness
+          description: Every claim in the output is directly supported by the provided context.
+          weight: 3.0
+          anchors:
+            low:  "Output contradicts or ignores the provided context."
+            mid:  "Output partially uses context but introduces at least one unsupported claim."
+            high: "All claims are traceable to quotes or paraphrases from the context."
+        - name: answer_relevance
+          description: The output directly and completely addresses the user's question.
+          weight: 2.0
+          anchors:
+            low:  "Output ignores the question or answers a different one."
+            mid:  "Output addresses part of the question but omits key aspects."
+            high: "Output fully answers the question with appropriate scope and detail."
+        - name: no_hallucination
+          description: The output contains no fabricated facts, statistics, names, or URLs.
+          weight: 3.0
+          anchors:
+            low:  "Output contains clearly fabricated claims."
+            mid:  "Output contains one uncertain claim that could not be verified."
+            high: "No claim in the output is invented; everything is verifiable from context."
+
+    - id: judge-gpt4
+      type: rubric
+      backend:
+        provider: openai
+        model: gpt-4o
+      weight: 1.0
+      calibration:
+        - prompt: "What causes hallucination in LLMs?"
+          output: "LLMs hallucinate because they are trained on the internet."
+          score: 0.3
+          rationale: "Vague and partially wrong — ignores training distribution and decoding factors."
+        - prompt: "What causes hallucination in LLMs?"
+          output: "Hallucination occurs when the model's next-token probability distribution assigns high mass to plausible-sounding but factually unsupported tokens, often due to gaps in training data or overconfident decoding."
+          score: 0.92
+          rationale: "Technically accurate with specific mechanisms named."
+      rubric:                     # identical rubric — this is what makes it a Panel
+        - name: faithfulness
+          description: Every claim in the output is directly supported by the provided context.
+          weight: 3.0
+          anchors:
+            low:  "Output contradicts or ignores the provided context."
+            mid:  "Output partially uses context but introduces at least one unsupported claim."
+            high: "All claims are traceable to quotes or paraphrases from the context."
+        - name: answer_relevance
+          description: The output directly and completely addresses the user's question.
+          weight: 2.0
+          anchors:
+            low:  "Output ignores the question or answers a different one."
+            mid:  "Output addresses part of the question but omits key aspects."
+            high: "Output fully answers the question with appropriate scope and detail."
+        - name: no_hallucination
+          description: The output contains no fabricated facts, statistics, names, or URLs.
+          weight: 3.0
+          anchors:
+            low:  "Output contains clearly fabricated claims."
+            mid:  "Output contains one uncertain claim that could not be verified."
+            high: "No claim in the output is invented; everything is verifiable from context."
+
+    - id: judge-haiku
+      type: rubric
+      backend:
+        provider: anthropic
+        model: claude-haiku-4-5-20251001
+      weight: 1.0
+      rubric:
+        - name: faithfulness
+          description: Every claim in the output is directly supported by the provided context.
+          weight: 3.0
+          anchors:
+            low:  "Output contradicts or ignores the provided context."
+            mid:  "Output partially uses context but introduces at least one unsupported claim."
+            high: "All claims are traceable to quotes or paraphrases from the context."
+        - name: answer_relevance
+          description: The output directly and completely addresses the user's question.
+          weight: 2.0
+          anchors:
+            low:  "Output ignores the question or answers a different one."
+            mid:  "Output addresses part of the question but omits key aspects."
+            high: "Output fully answers the question with appropriate scope and detail."
+        - name: no_hallucination
+          description: The output contains no fabricated facts, statistics, names, or URLs.
+          weight: 3.0
+
+# ── Statistical settings ──────────────────────────────────────────────────────
+# interval: score differences are meaningful (0.8 and 0.9 are genuinely closer
+# than 0.1 and 0.9). Use ordinal if you only care about rank order.
+
+scale_type: interval
+verbosity_bias_threshold: 0.30
+
+output:
+  format: text
+  include_verdicts: false

@@ -1,0 +1,73 @@
+# jury-eval config — pairwise pre-recorded evaluation
+#
+# Evaluates pre-recorded A/B output pairs using a PairwiseJudge.
+# Returns PairwiseReport (preference rates) instead of EvalReport (uplift).
+#
+# Use when:
+#   - You want to know which of two systems humans / judges prefer
+#   - You have crowdsourced or annotated comparison data
+#   - You are replicating an RLHF-style preference evaluation
+#   - You want pairwise preference rates (e.g. "System B preferred 73% of the time")
+#     rather than absolute quality scores
+#
+# Difference from evaluate_prerecorded:
+#   prerecorded → two outputs scored independently → uplift = treatment - control
+#   pairwise    → two outputs compared in one judge prompt → preference rate
+#
+# Dataset row format:
+#   {
+#     "id":       "pair-001",
+#     "prompt":   "Explain transformer attention in one paragraph.",
+#     "output_a": "System A's response text...",
+#     "output_b": "System B's response text..."
+#   }
+#
+# Output report fields:
+#   preference_rate_a  — fraction of cases where A was preferred
+#   preference_rate_b  — fraction of cases where B was preferred
+#   tie_rate           — fraction of ties
+#   mean_score_a       — mean score assigned to A across all cases
+#   mean_score_b       — mean score assigned to B across all cases
+#
+# Run:
+#   jury-eval run examples/config_pairwise.yaml
+#
+# Note: pairwise mode is CLI-mode "pairwise". It uses only the pairwise_judge
+# section; the panel section and generation backend are not used.
+#
+# Required env vars:
+#   ANTHROPIC_API_KEY
+
+mode: pairwise
+dataset_file: ./pairwise_evals.jsonl
+
+# ── Generation backend ────────────────────────────────────────────────────────
+# Not called in pairwise mode — outputs come from the dataset.
+# Required by the config schema.
+generation:
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+
+# ── Fields in the dataset that hold the two pre-recorded outputs ──────────────
+output_a_field: output_a        # default; change if your dataset uses different names
+output_b_field: output_b
+label_a: "System A"             # human-readable label used in the report
+label_b: "System B"
+
+# ── Pairwise judge ────────────────────────────────────────────────────────────
+# Uses a PairwiseJudge — the panel section is NOT used in pairwise mode.
+# The judge compares A and B in a single prompt and scores each independently.
+# To detect positional bias: the judge is called twice per pair with A/B swapped.
+# positional_bias_rate is reported in the output.
+
+pairwise_judge:
+  id: pairwise-claude
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+  temperature: 0.0
+
+output:
+  format: text
+  include_verdicts: false

@@ -1,0 +1,54 @@
+# jury-eval config — minimal skill evaluation
+#
+# The simplest possible configuration: one judge, no bias detection.
+# Use this to get started quickly or when you only have one API key.
+#
+# Decision guide: skill mode + single judge + no bias detection
+#   → answers "did adding this skill improve outputs?"
+#   → does NOT measure inter-rater agreement (requires ≥ 2 judges)
+#   → does NOT detect positional or verbosity bias
+#
+# Run:
+#   jury-eval run examples/config_skill_minimal.yaml
+#   jury-eval run examples/config_skill_minimal.yaml --format json --output report.json
+#
+# Required env vars:
+#   ANTHROPIC_API_KEY
+
+mode: skill
+skill_dir: ./my-skill             # must contain SKILL.md and evals/evals.json
+
+generation:
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+
+control:
+  name: control
+  temperature: 0.0
+  # No skill context — same model, same prompt, no SKILL.md injected.
+
+treatment:
+  name: treatment
+  temperature: 0.0
+  # skill_context is auto-loaded from SKILL.md — no need to specify here.
+
+panel:
+  type: panel
+  strategy: mean
+  judges:
+    - id: judge-claude
+      type: assertion             # scores each assertion in evals.json PASS/FAIL
+      backend:
+        provider: anthropic
+        model: claude-sonnet-4-6
+
+# No positional_judge — skip positional bias detection.
+# No calibration — ICL anchors omitted for brevity; add them for production use.
+
+scale_type: ordinal
+verbosity_bias_threshold: 0.30
+
+output:
+  format: text
+  include_verdicts: false

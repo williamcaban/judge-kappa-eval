@@ -1,0 +1,97 @@
+# jury-eval config — endpoint comparison
+#
+# Compares two live OpenAI-compatible model endpoints as evaluation targets.
+# Each variant specifies its OWN generation backend — no shared backend required.
+#
+# Use when:
+#   - Comparing GPT-4o vs GPT-4o-mini on the same task
+#   - Comparing a fine-tuned model (vLLM) vs the base model (OpenAI)
+#   - Comparing two different providers on identical prompts
+#   - A/B testing two model versions before promoting to production
+#
+# The evaluation target is the ENDPOINT, not a skill or dataset function.
+# Judges remain independent from the generation backends.
+#
+# Run:
+#   jury-eval run examples/config_endpoints.yaml
+#
+# Required env vars:
+#   ANTHROPIC_API_KEY        — for judges and positional_judge
+#   OPENAI_API_KEY           — for the OpenAI generation endpoints
+#   (set per-variant via api_key_env if endpoints use different keys)
+
+mode: skill
+skill_dir: ./my-skill          # evals.json assertions are the evaluation criteria
+
+# ── Generation backend (shared fallback — overridden per-variant below) ───────
+# This is used only if a variant does not specify its own generation backend.
+# In this config every variant specifies its own, so this is just a safety net.
+generation:
+  backend:
+    provider: openai
+    model: gpt-4o
+
+# ── Variant A: smaller / cheaper endpoint ─────────────────────────────────────
+control:
+  name: gpt-4o-mini
+  generation:
+    backend:
+      provider: openai
+      model: gpt-4o-mini
+      # api_key_env absent → reads OPENAI_API_KEY
+  temperature: 0.0
+
+# ── Variant B: larger / more capable endpoint ─────────────────────────────────
+treatment:
+  name: gpt-4o
+  generation:
+    backend:
+      provider: openai
+      model: gpt-4o
+  temperature: 0.0
+
+# ── Example: comparing a fine-tuned local model vs the hosted base ────────────
+# Uncomment and replace control/treatment above with:
+#
+# control:
+#   name: base-llama
+#   generation:
+#     backend:
+#       provider: openai
+#       model: meta-llama/Meta-Llama-3.1-70B-Instruct
+#       base_url: http://localhost:8000/v1    # hosted base model via vLLM
+#       api_key_env: ""                       # no auth
+#   temperature: 0.0
+#
+# treatment:
+#   name: fine-tuned-llama
+#   generation:
+#     backend:
+#       provider: openai
+#       model: my-org/llama-3.1-70b-finetuned-v2
+#       base_url: http://localhost:8001/v1    # fine-tuned model on a different port
+#       api_key_env: ""
+#   temperature: 0.0
+
+panel:
+  type: panel
+  strategy: mean
+  judges:
+    - id: judge-claude
+      type: assertion
+      backend:
+        provider: anthropic
+        model: claude-sonnet-4-6
+
+positional_judge:
+  id: positional-auditor
+  backend:
+    provider: anthropic
+    model: claude-sonnet-4-6
+
+scale_type: ordinal
+verbosity_bias_threshold: 0.30
+
+output:
+  format: text
+  include_verdicts: false
