@@ -11,7 +11,7 @@ This file is written for AI agents, agentic harnesses, and automated tooling tha
 | Field | Value |
 |---|---|
 | **Package name** | `judge-kappa` (PyPI), `judge_kappa` (Python import) |
-| **Version** | 0.2.0 |
+| **Version** | 0.2.1 |
 | **Repository** | https://github.com/williamcaban/judge-kappa-eval |
 | **Language** | Python 3.12+ |
 | **License** | Apache 2.0 |
