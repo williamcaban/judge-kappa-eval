@@ -107,6 +107,7 @@ python examples/demo_rank_judge.py
 
 | Doc | Contents |
 |---|---|
+| [AGENTS.md](AGENTS.md) | **Start here for agents/harnesses** — repo identity, science table, quick-start, contributing rules |
 | [Decision guide](docs/01-decision-guide.md) | Which mode to use — decision tree covering input format, judge strategy, bias detection, N systems, psychometric rigor, and providers |
 | [Input types](docs/02-input-types.md) | All entry points: `evaluate_skill`, `evaluate_dataset`, `evaluate_endpoints`, `evaluate_prerecorded`, `evaluate_pairwise_dataset`, `TournamentEvaluator`, `RankJudge` |
 | [Pairwise, Tournament, and Listwise](docs/03-pairwise-tournament.md) | Pairwise preference, N-system Elo tournament, RankJudge (N ≥ 7), champion-challenger; cost tables; mode selection guide |
