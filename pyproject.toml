@@ -65,6 +65,8 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.4",
     "mypy>=1.10",
+    "openai>=1.30",       # stubs for type-checking llm/openai_backend.py
+    "anthropic>=0.28",    # stubs for type-checking llm/anthropic_backend.py
 ]
 
 [tool.hatch.build.targets.wheel]

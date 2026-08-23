@@ -19,19 +19,21 @@ from pathlib import Path
 import yaml
 
 from judge_kappa.cli.builder import build_evaluator, load_dataset
-from judge_kappa.cli.config_schema import DatasetModeConfig, SkillModeConfig
+from judge_kappa.cli.config_schema import DatasetModeConfig, PairwiseModeConfig, SkillModeConfig
 from judge_kappa.models import EvalReport
 
 
-def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig:
+def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig | PairwiseModeConfig:
     raw = yaml.safe_load(Path(path).read_text())
     mode = raw.get("mode")
     if mode == "skill":
         return SkillModeConfig.model_validate(raw)
     elif mode == "dataset":
         return DatasetModeConfig.model_validate(raw)
+    elif mode == "pairwise":
+        return PairwiseModeConfig.model_validate(raw)
     else:
-        _die(f"Config 'mode' must be 'skill' or 'dataset', got: {mode!r}")
+        _die(f"Config 'mode' must be 'skill', 'dataset', or 'pairwise', got: {mode!r}")
     raise RuntimeError("unreachable")
 
 
@@ -87,6 +89,48 @@ def _die(msg: str) -> None:
 
 def cmd_run(config_path: str, output_file: str | None, fmt: str, include_verdicts: bool) -> None:
     config = _load_config(config_path)
+
+    if isinstance(config, PairwiseModeConfig):
+        from judge_kappa.cli.builder import _build_backend, _build_calibration
+        from judge_kappa.evaluator import JuryEvaluator
+        from judge_kappa.judges.pairwise import PairwiseJudge
+        from judge_kappa.panel.panel import JudgePanel
+        backend = _build_backend(config.pairwise_judge.backend)
+        cal = _build_calibration(config.pairwise_judge.calibration)
+        pj = PairwiseJudge(config.pairwise_judge.id, backend, calibration_examples=cal,
+                           temperature=config.pairwise_judge.temperature)
+        gen_backend = _build_backend(config.generation.backend)
+        # JudgePanel with a single assertion judge as a placeholder — pairwise mode
+        # never calls panel.evaluate(); it calls evaluate_pairwise_dataset() directly.
+        from judge_kappa.judges.assertion import AssertionJudge
+        panel = JudgePanel(judges=[AssertionJudge("_placeholder", gen_backend)])
+        evaluator = JuryEvaluator(panel=panel, generation_backend=gen_backend)
+        data = load_dataset(config.dataset_file)
+        pairwise_report = evaluator.evaluate_pairwise_dataset(
+            data=data,
+            pairwise_judge=pj,
+            output_a_field=config.output_a_field,
+            output_b_field=config.output_b_field,
+            label_a=config.label_a,
+            label_b=config.label_b,
+        )
+        if fmt == "json":
+            content = pairwise_report.model_dump_json(indent=2)
+        elif fmt == "jsonl":
+            content = "\n".join(c.model_dump_json() for c in pairwise_report.cases)
+        else:
+            content = (
+                f"=== judge-kappa Pairwise Report ===\n"
+                f"System A: {pairwise_report.label_a:<20} preferred: {pairwise_report.preference_rate_a:.1%}"
+                f"  mean score: {pairwise_report.mean_score_a:.3f}\n"
+                f"System B: {pairwise_report.label_b:<20} preferred: {pairwise_report.preference_rate_b:.1%}"
+                f"  mean score: {pairwise_report.mean_score_b:.3f}\n"
+                f"Ties:                               {pairwise_report.tie_rate:.1%}\n"
+            )
+        out = output_file or config.output.file
+        _write_output(content, out)
+        return
+
     evaluator = build_evaluator(config)
 
     if isinstance(config, SkillModeConfig):
@@ -110,7 +154,9 @@ def cmd_run(config_path: str, output_file: str | None, fmt: str, include_verdict
 
     else:  # dataset mode
         data = load_dataset(config.dataset_file)
-        report = evaluator.evaluate_dataset(data=data, predict_fn=lambda x: x.get("output", ""))
+        def _output_fn(x: dict[str, object]) -> str:
+            return str(x.get("output", ""))
+        report = evaluator.evaluate_dataset(data=data, predict_fn=_output_fn)
 
     if fmt == "json":
         exclude = None if include_verdicts else {"cases": {"__all__": {"verdicts"}}}
@@ -134,14 +180,18 @@ def cmd_validate(config_path: str) -> None:
 
 
 def cmd_schema() -> None:
-    """Print merged JSON Schema for both config modes."""
+    """Print merged JSON Schema for all config modes."""
     import json
 
-    from judge_kappa.cli.config_schema import DatasetModeConfig, SkillModeConfig
+    from judge_kappa.cli.config_schema import DatasetModeConfig, PairwiseModeConfig, SkillModeConfig
 
-    skill_schema   = SkillModeConfig.model_json_schema()
-    dataset_schema = DatasetModeConfig.model_json_schema()
-    print(json.dumps({"skill_mode": skill_schema, "dataset_mode": dataset_schema}, indent=2))
+    skill_schema    = SkillModeConfig.model_json_schema()
+    dataset_schema  = DatasetModeConfig.model_json_schema()
+    pairwise_schema = PairwiseModeConfig.model_json_schema()
+    print(json.dumps(
+        {"skill_mode": skill_schema, "dataset_mode": dataset_schema, "pairwise_mode": pairwise_schema},
+        indent=2,
+    ))
 
 
 def app() -> None:

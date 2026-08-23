@@ -165,4 +165,16 @@ class DatasetModeConfig(BaseModel):
     output: OutputConfig = Field(default_factory=OutputConfig)
 
 
-JuryEvalConfig = SkillModeConfig | DatasetModeConfig
+class PairwiseModeConfig(BaseModel):
+    mode: Literal["pairwise"]
+    dataset_file: str                    # path to JSONL with output_a / output_b fields
+    generation: GenerationConfig         # required by schema; not called in pairwise mode
+    pairwise_judge: PositionalJudgeConfig
+    output_a_field: str = "output_a"
+    output_b_field: str = "output_b"
+    label_a: str = "System A"
+    label_b: str = "System B"
+    output: OutputConfig = Field(default_factory=OutputConfig)
+
+
+JuryEvalConfig = SkillModeConfig | DatasetModeConfig | PairwiseModeConfig

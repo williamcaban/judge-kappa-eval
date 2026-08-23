@@ -12,11 +12,12 @@ from pathlib import Path
 from judge_kappa.cli.config_schema import (
     BackendConfig,
     CalibrationConfig,
+    DatasetModeConfig,
     JudgeConfig,
-    JuryEvalConfig,
     PanelConfig,
     PositionalJudgeConfig,
     RubricDimensionConfig,
+    SkillModeConfig,
     VariantConfig,
 )
 from judge_kappa.evaluator import JuryEvaluator
@@ -140,7 +141,7 @@ def _build_variant(cfg: VariantConfig, skill_md: str | None = None) -> Variant:
     )
 
 
-def build_evaluator(config: JuryEvalConfig) -> JuryEvaluator:
+def build_evaluator(config: SkillModeConfig | DatasetModeConfig) -> JuryEvaluator:
     panel = _build_panel(config.panel)
     gen_backend = _build_backend(config.generation.backend)
     pairwise = (
