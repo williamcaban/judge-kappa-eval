@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "judge-kappa"
-version = "0.1.0"
+version = "0.2.0"
 description = "Unified LLM evaluation: A/B uplift, Panel/Jury judges, Krippendorff α, Cohen κ, pairwise preference, Elo tournament, and bias detection"
 readme = { file = "README.md", content-type = "text/markdown" }
 license = { file = "LICENSE" }
