@@ -87,18 +87,20 @@ class TestResolveApiKey:
 
     # ── Provider scenario matrix ──────────────────────────────────────────────
 
-    @pytest.mark.parametrize("scenario,api_key_env,env_var,env_value,expected", [
-        ("anthropic-hosted",  None,               "ANTHROPIC_API_KEY",  "sk-ant-x",  "sk-ant-x"),
-        ("openai-hosted",     None,               "OPENAI_API_KEY",     "sk-oai-x",  "sk-oai-x"),
-        ("openrouter",        "OPENROUTER_API_KEY","OPENROUTER_API_KEY", "sk-or-x",   "sk-or-x"),
-        ("ollama-no-auth",    "",                 None,                 None,         "no-key"),
-        ("vllm-no-auth",      "",                 None,                 None,         "no-key"),
-        ("vllm-with-token",   "VLLM_API_KEY",     "VLLM_API_KEY",      "vllm-tok",  "vllm-tok"),
-        ("groq",              "GROQ_API_KEY",      "GROQ_API_KEY",      "gsk-x",     "gsk-x"),
-        ("together",          "TOGETHER_API_KEY",  "TOGETHER_API_KEY",  "tog-x",     "tog-x"),
+    @pytest.mark.parametrize("scenario,api_key_env,provider,env_var,env_value,expected", [
+        # api_key_env=None → use provider default env var
+        ("anthropic-hosted",  None,               "anthropic", "ANTHROPIC_API_KEY",  "sk-ant-x",  "sk-ant-x"),
+        ("openai-hosted",     None,               "openai",    "OPENAI_API_KEY",     "sk-oai-x",  "sk-oai-x"),
+        # api_key_env=explicit var name → use that var regardless of provider
+        ("openrouter",        "OPENROUTER_API_KEY","openai",   "OPENROUTER_API_KEY", "sk-or-x",   "sk-or-x"),
+        ("ollama-no-auth",    "",                 "openai",    None,                 None,         "no-key"),
+        ("vllm-no-auth",      "",                 "openai",    None,                 None,         "no-key"),
+        ("vllm-with-token",   "VLLM_API_KEY",     "openai",    "VLLM_API_KEY",      "vllm-tok",  "vllm-tok"),
+        ("groq",              "GROQ_API_KEY",      "openai",   "GROQ_API_KEY",       "gsk-x",     "gsk-x"),
+        ("together",          "TOGETHER_API_KEY",  "openai",   "TOGETHER_API_KEY",   "tog-x",     "tog-x"),
     ])
-    def test_provider_scenario(self, scenario, api_key_env, env_var, env_value, expected):
+    def test_provider_scenario(self, scenario, api_key_env, provider, env_var, env_value, expected):
         env_patch = {env_var: env_value} if env_var and env_value else {}
         with patch.dict(os.environ, env_patch):
-            key = _resolve_api_key(api_key_env, "openai")
+            key = _resolve_api_key(api_key_env, provider)
         assert key == expected, f"Scenario '{scenario}' failed"

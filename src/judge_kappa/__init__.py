@@ -24,25 +24,35 @@ from judge_kappa.models import (
     CaseResult,
     EvalCase,
     EvalReport,
+    JudgeFitResult,
     JudgeVerdict,
     PairwiseCaseResult,
     PairwiseReport,
     RubricDimension,
     ScaleType,
+    UpliftSignificance,
     Variant,
     VariantResult,
 )
 from judge_kappa.adapters import DatasetAdapter, InputAdapter, SkillAdapter
-from judge_kappa.judges import AssertionJudge, LLMJudge, PairwiseJudge, RubricJudge
+from judge_kappa.judges import AssertionJudge, LLMJudge, PairwiseJudge, RubricJudge, RankJudge
 from judge_kappa.llm import AnthropicBackend, LLMBackend, OpenAIBackend
 from judge_kappa.panel import EvaluationPanel, JudgeJury, JudgePanel
-from judge_kappa.agreement import AgreementMetric, CohenKappa, KrippendorffAlpha
+from judge_kappa.agreement import (
+    AgreementMetric,
+    BehavioralAlignmentMetric,
+    CohenKappa,
+    KrippendorffAlpha,
+    PersonFitAnalyzer,
+)
 from judge_kappa.bias import (
     BiasDetector,
+    DifferentialItemFunctioningDetector,
     PositionalBiasDetector,
     PositionalBiasReport,
     VerbosityBiasDetector,
 )
+from judge_kappa.calibration import IRTJudgeWeighter
 
 __all__ = [
     # Evaluator
@@ -50,19 +60,22 @@ __all__ = [
     # Models
     "AggregationStrategy", "AgreementResult", "Assertion", "BiasResult",
     "CalibrationExample", "CaseResult", "EvalCase", "EvalReport",
-    "JudgeVerdict", "PairwiseCaseResult", "PairwiseReport",
-    "RubricDimension", "ScaleType", "Variant", "VariantResult",
+    "JudgeFitResult", "JudgeVerdict", "PairwiseCaseResult", "PairwiseReport",
+    "RubricDimension", "ScaleType", "UpliftSignificance", "Variant", "VariantResult",
     # Adapters
     "InputAdapter", "SkillAdapter", "DatasetAdapter",
     # Judges
-    "LLMJudge", "AssertionJudge", "RubricJudge", "PairwiseJudge",
+    "LLMJudge", "AssertionJudge", "RubricJudge", "PairwiseJudge", "RankJudge",
     # LLM backends
     "LLMBackend", "OpenAIBackend", "AnthropicBackend",
     # Panels
     "EvaluationPanel", "JudgePanel", "JudgeJury",
     # Agreement
-    "AgreementMetric", "CohenKappa", "KrippendorffAlpha",
+    "AgreementMetric", "BehavioralAlignmentMetric", "CohenKappa",
+    "KrippendorffAlpha", "PersonFitAnalyzer",
     # Bias
-    "BiasDetector", "PositionalBiasDetector", "PositionalBiasReport",
-    "VerbosityBiasDetector",
+    "BiasDetector", "DifferentialItemFunctioningDetector",
+    "PositionalBiasDetector", "PositionalBiasReport", "VerbosityBiasDetector",
+    # Calibration
+    "IRTJudgeWeighter",
 ]

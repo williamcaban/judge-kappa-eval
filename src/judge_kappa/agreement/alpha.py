@@ -37,7 +37,29 @@ def _interpret(alpha: float) -> str:
         return "unreliable — recalibrate judges or revise rubric (α < 0.67)"
 
 
+def _build_matrix(
+    verdicts: list[JudgeVerdict],
+    judge_ids: list[str],
+    case_ids: list[str],
+) -> np.ndarray:
+    """Build (n_judges, n_cases) reliability matrix with NaN for missing entries."""
+    lookup: dict[str, dict[str, float]] = {j: {} for j in judge_ids}
+    for v in verdicts:
+        lookup[v.judge_id][v.eval_case_id] = v.score
+    data = np.full((len(judge_ids), len(case_ids)), np.nan, dtype=float)
+    for i, j in enumerate(judge_ids):
+        for k, c in enumerate(case_ids):
+            if c in lookup[j]:
+                data[i, k] = lookup[j][c]
+    return data
+
+
 class KrippendorffAlpha(AgreementMetric):
+    def __init__(self, bootstrap_ci: bool = True, n_bootstrap: int = 2000, seed: int = 42) -> None:
+        self._bootstrap_ci = bootstrap_ci
+        self._n_bootstrap = n_bootstrap
+        self._seed = seed
+
     def compute(
         self,
         verdicts: list[JudgeVerdict],
@@ -46,27 +68,52 @@ class KrippendorffAlpha(AgreementMetric):
         judge_ids = sorted({v.judge_id for v in verdicts})
         case_ids  = sorted({v.eval_case_id for v in verdicts})
 
-        matrix: dict[str, dict[str, float]] = {j: {} for j in judge_ids}
-        for v in verdicts:
-            matrix[v.judge_id][v.eval_case_id] = v.score
+        reliability_data = _build_matrix(verdicts, judge_ids, case_ids)
 
-        # reliability_data shape: (n_judges, n_cases); NaN where missing
-        reliability_data = np.full(
-            (len(judge_ids), len(case_ids)), np.nan, dtype=float
-        )
-        for i, j in enumerate(judge_ids):
-            for k, c in enumerate(case_ids):
-                if c in matrix[j]:
-                    reliability_data[i, k] = matrix[j][c]
+        try:
+            alpha = float(krippendorff.alpha(
+                reliability_data=reliability_data,
+                level_of_measurement=scale_type.value,
+            ))
+        except ValueError:
+            # Single-value domain: all raters gave identical scores → perfect agreement
+            alpha = 1.0
 
-        alpha = float(krippendorff.alpha(
-            reliability_data=reliability_data,
-            level_of_measurement=scale_type.value,
-        ))
+        ci_low, ci_high = None, None
+        if self._bootstrap_ci and len(case_ids) >= 5:
+            ci_low, ci_high = self._bootstrap_ci_bounds(
+                reliability_data, scale_type, len(case_ids)
+            )
 
         return AgreementResult(
             alpha=round(alpha, 4),
+            alpha_ci_low=ci_low,
+            alpha_ci_high=ci_high,
             alpha_interpretation=_interpret(alpha),
             n_judges=len(judge_ids),
             n_cases=len(case_ids),
         )
+
+    def _bootstrap_ci_bounds(
+        self,
+        data: np.ndarray,
+        scale_type: ScaleType,
+        n_cases: int,
+    ) -> tuple[float, float]:
+        rng = np.random.default_rng(self._seed)
+        boot_alphas: list[float] = []
+        for _ in range(self._n_bootstrap):
+            idx = rng.integers(0, n_cases, size=n_cases)
+            sample = data[:, idx]
+            try:
+                a = float(krippendorff.alpha(
+                    reliability_data=sample,
+                    level_of_measurement=scale_type.value,
+                ))
+                boot_alphas.append(a)
+            except Exception:
+                pass
+        if not boot_alphas:
+            return None, None  # type: ignore[return-value]
+        arr = np.array(boot_alphas)
+        return round(float(np.percentile(arr, 2.5)), 4), round(float(np.percentile(arr, 97.5)), 4)

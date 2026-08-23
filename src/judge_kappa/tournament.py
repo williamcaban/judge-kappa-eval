@@ -287,9 +287,12 @@ class TournamentEvaluator:
                     if self._detect_positional_bias:
                         # Round 2: B first (swapped)
                         vb2, va2 = self._judge.judge_pair(case, out_b, out_a, b, a)
-                        r1_a_preferred = va.score > vb.score
-                        r2_a_preferred = va2.score > vb2.score
-                        if r1_a_preferred and r2_a_preferred:
+                        # Positional bias = first-positioned output wins in both rounds:
+                        #   R1: A is first → A wins (va.score > vb.score)
+                        #   R2: B is first → B wins (vb2.score > va2.score)
+                        r1_first_preferred = va.score > vb.score
+                        r2_first_preferred = vb2.score > va2.score
+                        if r1_first_preferred and r2_first_preferred:
                             pos_flips[pair_key] += 1
                         pair_totals[pair_key] += 1
 

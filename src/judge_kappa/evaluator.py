@@ -39,7 +39,9 @@ import numpy as np
 from judge_kappa.adapters.dataset import DatasetAdapter
 from judge_kappa.adapters.skill import SkillAdapter
 from judge_kappa.agreement.alpha import KrippendorffAlpha
+from judge_kappa.agreement.icc import enrich_agreement_with_icc
 from judge_kappa.agreement.kappa import CohenKappa
+from judge_kappa.agreement.personfit import PersonFitAnalyzer
 from judge_kappa.bias.positional import PositionalBiasDetector, PositionalBiasReport
 from judge_kappa.bias.verbosity import VerbosityBiasDetector
 from judge_kappa.judges.pairwise import PairwiseJudge
@@ -50,15 +52,65 @@ from judge_kappa.models import (
     CaseResult,
     EvalCase,
     EvalReport,
+    JudgeFitResult,
     JudgeVerdict,
     PairwiseCaseResult,
     PairwiseReport,
     RubricDimension,
     ScaleType,
+    UpliftSignificance,
     Variant,
     VariantResult,
 )
 from judge_kappa.panel.base import EvaluationPanel
+
+
+def _mcnemar_and_ci(
+    case_results: list[CaseResult],
+    n_bootstrap: int = 2000,
+    seed: int = 42,
+) -> UpliftSignificance:
+    """
+    Compute McNemar test + bootstrap 95% CI for mean uplift.
+
+    McNemar operates on binarised per-case verdicts:
+      treatment_wins = treatment score > control score for that case.
+    Only discordant pairs (one variant wins, the other loses) carry information.
+    """
+    n_trt_wins = sum(1 for r in case_results if r.uplift > 0)
+    n_ctrl_wins = sum(1 for r in case_results if r.uplift < 0)
+    n_ties = sum(1 for r in case_results if r.uplift == 0)
+
+    discordant = n_trt_wins + n_ctrl_wins
+    if discordant == 0:
+        # All ties — McNemar statistic is 0
+        mcnemar_stat, p_value = 0.0, 1.0
+    else:
+        # Continuity-corrected McNemar (Edwards 1948)
+        mcnemar_stat = float((abs(n_trt_wins - n_ctrl_wins) - 1) ** 2 / discordant)
+        from scipy import stats as _stats
+        p_value = float(_stats.chi2.sf(mcnemar_stat, df=1))
+
+    # Bootstrap CI for mean uplift
+    uplift_vals = np.array([r.uplift for r in case_results])
+    rng = np.random.default_rng(seed)
+    boot_means = np.mean(
+        rng.choice(uplift_vals, size=(n_bootstrap, len(uplift_vals)), replace=True),
+        axis=1,
+    )
+    ci_low  = round(float(np.percentile(boot_means, 2.5)), 4)
+    ci_high = round(float(np.percentile(boot_means, 97.5)), 4)
+
+    return UpliftSignificance(
+        n_treatment_wins=n_trt_wins,
+        n_control_wins=n_ctrl_wins,
+        n_ties=n_ties,
+        mcnemar_statistic=round(mcnemar_stat, 4),
+        p_value=round(p_value, 4),
+        significant=p_value < 0.05,
+        uplift_ci_low=ci_low,
+        uplift_ci_high=ci_high,
+    )
 
 
 def _run_variant(variant: Variant, case: EvalCase, default_backend: LLMBackend) -> str:
@@ -90,19 +142,29 @@ class JuryEvaluator:
         scale_type: ScaleType = ScaleType.ORDINAL,
         positional_judge: Optional[PairwiseJudge] = None,
         verbosity_bias_threshold: float = 0.30,
+        compute_significance: bool = True,
+        compute_icc: bool = True,
+        compute_judge_fit: bool = True,
+        bootstrap_ci: bool = True,
+        n_bootstrap: int = 2000,
     ) -> None:
         self._panel = panel
         self._gen_backend = generation_backend
         self._scale_type = scale_type
         self._positional_judge = positional_judge
         self._verbosity_threshold = verbosity_bias_threshold
+        self._compute_significance = compute_significance
+        self._compute_icc = compute_icc
+        self._compute_judge_fit = compute_judge_fit
+        self._n_bootstrap = n_bootstrap
 
-        self._alpha_metric = KrippendorffAlpha()
+        self._alpha_metric = KrippendorffAlpha(bootstrap_ci=bootstrap_ci, n_bootstrap=n_bootstrap)
         self._kappa_metric = CohenKappa()
         self._verbosity_detector = VerbosityBiasDetector(verbosity_bias_threshold)
         self._positional_detector = (
             PositionalBiasDetector(positional_judge) if positional_judge else None
         )
+        self._person_fit_analyzer = PersonFitAnalyzer() if compute_judge_fit else None
 
     # ── Public entry points ──────────────────────────────────────────────────
 
@@ -346,18 +408,25 @@ class JuryEvaluator:
                 positional_flip=pos_flag,
             ))
 
-        # Corpus-level metrics
+        # Corpus-level agreement (α with bootstrap CI + κ)
         corpus_alpha  = self._alpha_metric.compute(all_verdicts, self._scale_type)
         corpus_kappa  = self._kappa_metric.compute(all_verdicts, self._scale_type)
         corpus_agreement = AgreementResult(
             kappa=corpus_kappa.kappa,
             alpha=corpus_alpha.alpha,
+            alpha_ci_low=corpus_alpha.alpha_ci_low,
+            alpha_ci_high=corpus_alpha.alpha_ci_high,
             expected_chance_agreement=corpus_kappa.expected_chance_agreement,
             alpha_interpretation=corpus_alpha.alpha_interpretation,
             n_judges=corpus_alpha.n_judges,
             n_cases=corpus_alpha.n_cases,
         )
 
+        # ICC(2,k) — optional variance decomposition
+        if self._compute_icc:
+            corpus_agreement = enrich_agreement_with_icc(corpus_agreement, all_verdicts)
+
+        # Bias metrics
         verb_bias = self._verbosity_detector.detect(verdicts=all_verdicts)
         pos_bias_result = (
             self._positional_detector.detect(reports=pos_reports)
@@ -371,6 +440,20 @@ class JuryEvaluator:
             verbosity_biased=verb_bias.verbosity_biased,
         )
 
+        # McNemar significance test + bootstrap CI for mean uplift
+        significance = (
+            _mcnemar_and_ci(case_results, n_bootstrap=self._n_bootstrap)
+            if self._compute_significance
+            else None
+        )
+
+        # Per-judge person-fit (outfit MNSQ t-statistic)
+        judge_fit: list[JudgeFitResult] = (
+            self._person_fit_analyzer.analyze(all_verdicts)
+            if self._person_fit_analyzer and len(self._panel.judge_ids) >= 2
+            else []
+        )
+
         uplift_vals = [r.uplift for r in case_results]
         return EvalReport(
             cases=case_results,
@@ -382,6 +465,8 @@ class JuryEvaluator:
                 float(np.mean([r.treatment.score for r in case_results])), 4
             ),
             agreement=corpus_agreement,
+            significance=significance,
+            judge_fit=judge_fit,
             bias=corpus_bias,
             judge_ids=self._panel.judge_ids,
             scale_type=self._scale_type,

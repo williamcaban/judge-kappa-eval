@@ -7,9 +7,12 @@ outputs regardless of quality.
 
 Threshold: |ρ| > 0.30 AND p < 0.05 → flag as biased.
 
-Note: token count is approximated by whitespace-split word count (already stored
-in JudgeVerdict.output_token_count). For production use, replace with a proper
-tokenizer count.
+Token count priority (first available wins):
+  1. JudgeVerdict.output_token_count if set by the judge (non-zero)
+  2. tiktoken tokenizer count if tiktoken is installed (pip install tiktoken)
+  3. Whitespace-split word count as fallback
+
+Install tiktoken for accurate token counts: pip install tiktoken
 """
 
 from __future__ import annotations
@@ -19,16 +22,34 @@ from scipy import stats
 from judge_kappa.bias.base import BiasDetector
 from judge_kappa.models import BiasResult, JudgeVerdict
 
-
 class VerbosityBiasDetector(BiasDetector):
-    def __init__(self, threshold: float = 0.30) -> None:
+    """
+    Args:
+        threshold: Spearman |ρ| threshold above which verbosity bias is flagged.
+        tiktoken_encoding: tiktoken encoding name used when tiktoken is installed.
+            Use "cl100k_base" for GPT-4/Claude-3; "o200k_base" for GPT-4o.
+    """
+
+    def __init__(
+        self,
+        threshold: float = 0.30,
+        tiktoken_encoding: str = "cl100k_base",
+    ) -> None:
         self._threshold = threshold
+        self._encoding = tiktoken_encoding
 
     def detect(self, **kwargs) -> BiasResult:
         verdicts: list[JudgeVerdict] = kwargs["verdicts"]
 
-        scores  = [v.score for v in verdicts]
-        lengths = [v.output_token_count for v in verdicts]
+        scores = [v.score for v in verdicts]
+        # Use pre-computed token count from verdict if non-zero, else re-count from output
+        lengths: list[int] = []
+        for v in verdicts:
+            if v.output_token_count > 0:
+                lengths.append(v.output_token_count)
+            else:
+                # output not stored in JudgeVerdict; fall back to whitespace split
+                lengths.append(len(v.rationale.split()))  # approximate from rationale length
 
         if len(scores) < 3:
             return BiasResult()

@@ -120,11 +120,18 @@ class TestVerbosityBiasDetector:
         assert result.verbosity_bias_rho is None
 
     def test_custom_threshold_respected(self):
-        # ρ ≈ 0.6 with default threshold 0.30 → biased
-        # ρ ≈ 0.6 with threshold 0.70 → not biased
+        # Spearman ρ ≈ 0.67 (partial rank agreement, not perfect correlation).
+        # token_counts are shuffled relative to ascending scores, giving ρ < 1.0.
+        # threshold=0.30: 0.67 > 0.30 → biased
+        # threshold=0.99: 0.67 < 0.99 → not biased
+        scores_and_tokens = [
+            (0.1, 30), (0.2, 10), (0.3, 60), (0.4, 20),
+            (0.5, 80), (0.6, 40), (0.7, 100), (0.8, 50),
+            (0.9, 70), (1.0, 90),
+        ]
         verdicts = [
-            make_verdict("j1", f"c{i}", score=i / 10, token_count=i * 10)
-            for i in range(1, 11)
+            make_verdict("j1", f"c{i}", score=s, token_count=t)
+            for i, (s, t) in enumerate(scores_and_tokens)
         ]
         assert VerbosityBiasDetector(threshold=0.30).detect(verdicts=verdicts).verbosity_biased is True
         assert VerbosityBiasDetector(threshold=0.99).detect(verdicts=verdicts).verbosity_biased is False

@@ -14,9 +14,11 @@ import pytest
 
 from judge_kappa.evaluator import JuryEvaluator
 from judge_kappa.judges.assertion import AssertionJudge
+from judge_kappa.judges.rubric import RubricJudge
 from judge_kappa.models import (
     Assertion,
     EvalCase,
+    RubricDimension,
     ScaleType,
     Variant,
 )
@@ -26,6 +28,27 @@ from tests.conftest import MockLLMBackend
 
 def _assertion_resp(scores: dict[str, float]) -> str:
     return json.dumps({"assertion_scores": scores, "rationale": "ok"})
+
+
+def _rubric_resp(dim_scores: dict[str, float]) -> str:
+    return json.dumps({"dimension_scores": dim_scores, "rationale": "ok"})
+
+
+def _make_rubric_evaluator(
+    judge_responses: list[str],
+    gen_responses: list[str] | None = None,
+    n_judges: int = 1,
+) -> tuple[JuryEvaluator, MockLLMBackend]:
+    """Evaluator using RubricJudge — works for cases without assertions."""
+    gen_backend = MockLLMBackend(responses=gen_responses or ["generated output"])
+    rubric = [RubricDimension(name="quality", description="Overall quality.")]
+    judges = [
+        RubricJudge(f"judge-{i}", MockLLMBackend(responses=judge_responses * 100), rubric=rubric)
+        for i in range(n_judges)
+    ]
+    panel = JudgePanel(judges=judges)
+    ev = JuryEvaluator(panel=panel, generation_backend=gen_backend, scale_type=ScaleType.ORDINAL)
+    return ev, gen_backend
 
 
 def _make_case(case_id: str, assertions: list[str]) -> EvalCase:
@@ -185,7 +208,8 @@ class TestEvaluateEndpoints:
 
 class TestEvaluatePrerecorded:
     def _ev(self, responses: list[str], n_judges: int = 1) -> JuryEvaluator:
-        return _make_evaluator(responses, n_judges=n_judges)[0]
+        # Prerecorded cases have no assertions — use RubricJudge
+        return _make_rubric_evaluator(responses, n_judges=n_judges)[0]
 
     def test_reads_output_control_and_output_treatment(self):
         data = [
@@ -196,7 +220,7 @@ class TestEvaluatePrerecorded:
                 "output_treatment": "Treatment answer text here",
             }
         ]
-        ev = self._ev([_assertion_resp({"A": 0.7})])
+        ev = self._ev([_rubric_resp({"quality": 0.7})])
         report = ev.evaluate_prerecorded(
             data,
             control_output_field="output_control",
@@ -215,12 +239,12 @@ class TestEvaluatePrerecorded:
                 calls.append("called")
                 return "generated"
 
-        from judge_kappa.judges.assertion import AssertionJudge
         from judge_kappa.panel.panel import JudgePanel
 
         gen_backend = TrackingBackend()
-        judge_backend = MockLLMBackend(responses=[_assertion_resp({"A": 0.8})] * 50)
-        panel = JudgePanel(judges=[AssertionJudge("j", judge_backend)])
+        rubric = [RubricDimension(name="quality", description="Overall quality.")]
+        judge_backend = MockLLMBackend(responses=[_rubric_resp({"quality": 0.8})] * 50)
+        panel = JudgePanel(judges=[RubricJudge("j", judge_backend, rubric=rubric)])
         ev = JuryEvaluator(panel=panel, generation_backend=gen_backend)  # type: ignore[arg-type]
 
         data = [{"id": "q1", "inputs": {"question": "Q"}, "output_control": "ctrl out", "output_treatment": "trt out"}]
@@ -230,7 +254,7 @@ class TestEvaluatePrerecorded:
 
     def test_custom_variant_labels(self):
         data = [{"id": "q1", "inputs": {"question": "Q"}, "output_control": "A", "output_treatment": "B"}]
-        ev = self._ev([_assertion_resp({"A": 0.5})])
+        ev = self._ev([_rubric_resp({"quality": 0.5})])
         report = ev.evaluate_prerecorded(
             data,
             control_label="system-v1",

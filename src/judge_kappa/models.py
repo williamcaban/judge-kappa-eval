@@ -106,10 +106,21 @@ class VariantResult(BaseModel):
 class AgreementResult(BaseModel):
     kappa: Optional[float] = None
     alpha: Optional[float] = None
+    alpha_ci_low: Optional[float] = None   # bootstrap 95% CI lower bound
+    alpha_ci_high: Optional[float] = None  # bootstrap 95% CI upper bound
+    icc: Optional[float] = None            # ICC(2,k) absolute agreement
+    icc_interpretation: Optional[str] = None
     expected_chance_agreement: Optional[float] = None
     alpha_interpretation: Optional[str] = None
     n_judges: int = 0
     n_cases: int = 0
+
+
+class JudgeFitResult(BaseModel):
+    """Per-judge person-fit statistic — flags inconsistent judges."""
+    judge_id: str
+    lz_statistic: float          # standardised log-likelihood; |lz| > 1.96 → p < 0.05
+    flagged_inconsistent: bool   # True when |lz| > 1.96
 
 
 class BiasResult(BaseModel):
@@ -117,6 +128,18 @@ class BiasResult(BaseModel):
     verbosity_bias_rho: Optional[float] = None  # Spearman ρ(length, score)
     verbosity_bias_p: Optional[float] = None
     verbosity_biased: bool = False
+
+
+class UpliftSignificance(BaseModel):
+    """McNemar test result for treatment vs. control significance."""
+    n_treatment_wins: int    # cases where treatment > control
+    n_control_wins: int      # cases where control > treatment
+    n_ties: int
+    mcnemar_statistic: float
+    p_value: float
+    significant: bool        # p < 0.05
+    uplift_ci_low: float     # bootstrap 95% CI lower bound for mean_uplift
+    uplift_ci_high: float    # bootstrap 95% CI upper bound for mean_uplift
 
 
 class CaseResult(BaseModel):
@@ -135,6 +158,8 @@ class EvalReport(BaseModel):
     mean_control_score: float
     mean_treatment_score: float
     agreement: AgreementResult
+    significance: Optional[UpliftSignificance] = None   # McNemar + bootstrap CI
+    judge_fit: list[JudgeFitResult] = Field(default_factory=list)  # per-judge l_z
     bias: BiasResult
     judge_ids: list[str]
     scale_type: ScaleType
