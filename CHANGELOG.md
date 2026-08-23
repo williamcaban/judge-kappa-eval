@@ -9,6 +9,73 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-08-23
+
+### Fixed
+
+- **Bug: Tournament positional bias inverted** (`tournament.py`). The detector was counting
+  cases where system A won in *both* orderings (a quality signal) as positional flips.
+  Corrected to count first-positioned output winning in both rounds — the same semantics as
+  `PositionalBiasDetector` in `bias/positional.py`.
+
+### Added
+
+**Psychometric agreement metrics**
+- `KrippendorffAlpha`: bootstrap 95% CI for α (`alpha_ci_low`, `alpha_ci_high` in
+  `AgreementResult`). Configurable `n_bootstrap` (default 2000) and `seed`.
+- `agreement/icc.py`: ICC(2,k) absolute agreement. Decomposes variance into between-cases
+  (signal), between-judges (systematic bias), and residual — reveals *why* judges disagree.
+  `icc` and `icc_interpretation` added to `AgreementResult`.
+- `agreement/personfit.py`: `PersonFitAnalyzer` — outfit MNSQ t-statistic per judge.
+  Flags judges that score inconsistently relative to the panel (|t| > 1.96 → `flagged_inconsistent`).
+  Model-free approximation of the IRT lz statistic (Wright & Masters 1982).
+- `agreement/behavioral.py`: `BehavioralAlignmentMetric` — Krippendorff α repurposed for
+  cross-condition behavioral consistency. `judge_id` encodes the condition name; α < 0.80
+  indicates the model is sensitive to prompt framing (DISC paper connection).
+
+**IRT-based judge weighting**
+- `calibration/irt.py`: `IRTJudgeWeighter` — 2PL MLE with log-normal prior on discrimination
+  and normal prior on difficulty (Fonseca Rivera et al. 2026 methodology). Fits a judge ×
+  calibration-example response matrix; converts latent θ to panel weights via softmax.
+  Item discrimination/difficulty parameters available via `item_parameters()`.
+
+**DIF analysis**
+- `bias/dif.py`: `DifferentialItemFunctioningDetector` — logistic regression (Mantel-Haenszel
+  protocol) flags eval cases where verdict probability differs systematically across judge model
+  families after controlling for overall score level. Returns `DIFReport` with per-case p-values.
+
+**RankJudge**
+- `judges/rank.py`: `RankJudge` — listwise ranking of N systems in a single judge call.
+  O(N) alternative to the O(N²) pairwise tournament for N ≥ 7. Rank converted to 0–1 score
+  (rank 1 → 1.0, rank N → 0.0). Configurable `max_systems` cap.
+
+**Uplift significance**
+- `evaluator.py`: `_mcnemar_and_ci()` — continuity-corrected McNemar test on binarised per-case
+  verdicts + bootstrap 95% CI for mean uplift. Exposed in `EvalReport.significance`
+  (`UpliftSignificance` model).
+
+**Models**
+- `AgreementResult`: `alpha_ci_low`, `alpha_ci_high`, `icc`, `icc_interpretation`
+- `JudgeFitResult`: `judge_id`, `lz_statistic`, `flagged_inconsistent`
+- `UpliftSignificance`: `n_treatment_wins`, `n_control_wins`, `n_ties`,
+  `mcnemar_statistic`, `p_value`, `significant`, `uplift_ci_low`, `uplift_ci_high`
+- `EvalReport`: `significance: Optional[UpliftSignificance]`, `judge_fit: list[JudgeFitResult]`
+
+**JuryEvaluator constructor params** (all default to enabled):
+  `compute_significance`, `compute_icc`, `compute_judge_fit`, `bootstrap_ci`, `n_bootstrap`
+
+**Optional dependency**: `tiktoken` extra (`pip install judge-kappa[tiktoken]`) for accurate
+  token counts in `VerbosityBiasDetector`.
+
+### Fixed (pre-existing test failures)
+
+- `KrippendorffAlpha.compute()` now handles single-value domains (all judges agree) gracefully
+  by returning α=1.0 by convention instead of raising `ValueError`.
+- Verbosity threshold test data corrected to give Spearman ρ≈0.67 (not ρ=1.0 as before).
+- Prerecorded evaluator tests now use `RubricJudge` (cases loaded from datasets have no assertions).
+- Key resolution test: `anthropic-hosted` scenario passes `provider="anthropic"` correctly.
+- Test count: 151 passed (up from 37 passing / 15 failing in v0.1.0).
+
 ## [0.1.0] — 2026-06-07
 
 ### Added
