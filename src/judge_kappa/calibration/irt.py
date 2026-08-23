@@ -89,7 +89,7 @@ def _neg_log_likelihood(
     prior_a = -np.sum(log_as ** 2) / (2 * prior_a_sigma ** 2)
     prior_b = -np.sum(bs ** 2) / (2 * prior_b_sigma ** 2)
 
-    return -(log_lik + prior_a + prior_b)
+    return float(-(log_lik + prior_a + prior_b))
 
 
 class IRTJudgeWeighter:
@@ -126,7 +126,7 @@ class IRTJudgeWeighter:
         self,
         judge_scores: dict[str, list[float]],
         human_scores: list[float],
-    ) -> "IRTJudgeWeighter":
+    ) -> IRTJudgeWeighter:
         """
         Fit the 2PL model.
 
@@ -177,7 +177,7 @@ class IRTJudgeWeighter:
         log_as = opt[n_judges: n_judges + n_items]
         bs     = opt[n_judges + n_items:]
 
-        self._theta = dict(zip(self._judge_names, thetas.tolist()))
+        self._theta = dict(zip(self._judge_names, thetas.tolist(), strict=True))
         self._item_a = np.exp(log_as).tolist()
         self._item_b = bs.tolist()
         self._fitted = True
@@ -203,15 +203,15 @@ class IRTJudgeWeighter:
         exp_t = np.exp(thetas - thetas.max())
         softmax = exp_t / exp_t.sum()
         if not normalise:
-            return dict(zip(self._judge_names, softmax.tolist()))
-        return {n: round(float(w), 4) for n, w in zip(self._judge_names, softmax)}
+            return dict(zip(self._judge_names, softmax.tolist(), strict=True))
+        return {n: round(float(w), 4) for n, w in zip(self._judge_names, softmax, strict=True)}
 
     def item_parameters(self) -> list[dict[str, float]]:
         """Return list of {a: discrimination, b: difficulty} per calibration example."""
         self._check_fitted()
         return [
             {"a": round(a, 4), "b": round(b, 4)}
-            for a, b in zip(self._item_a, self._item_b)
+            for a, b in zip(self._item_a, self._item_b, strict=True)
         ]
 
     def _check_fitted(self) -> None:

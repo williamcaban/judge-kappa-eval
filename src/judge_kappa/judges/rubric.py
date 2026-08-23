@@ -8,6 +8,7 @@ Expected output (when provided) is included in the prompt for grounding.
 from __future__ import annotations
 
 import textwrap
+from typing import Any
 
 from judge_kappa.judges.base import LLMJudge
 from judge_kappa.models import EvalCase, JudgeVerdict, RubricDimension
@@ -28,7 +29,7 @@ _SYSTEM = textwrap.dedent("""\
 
 
 class RubricJudge(LLMJudge):
-    def __init__(self, *args, rubric: list[RubricDimension], **kwargs) -> None:
+    def __init__(self, *args: Any, rubric: list[RubricDimension], **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._rubric = rubric
 

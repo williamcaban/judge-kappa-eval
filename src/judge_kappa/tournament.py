@@ -28,13 +28,12 @@ Entry points:
 from __future__ import annotations
 
 import itertools
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Callable, Mapping, Optional
 
 from judge_kappa.judges.pairwise import PairwiseJudge
 from judge_kappa.llm.base import LLMBackend
 from judge_kappa.models import EvalCase, Variant
-
 
 # ── Output models ─────────────────────────────────────────────────────────────
 
@@ -146,7 +145,7 @@ class TournamentEvaluator:
     def __init__(
         self,
         pairwise_judge: PairwiseJudge,
-        generation_backend: Optional[LLMBackend] = None,
+        generation_backend: LLMBackend | None = None,
         detect_positional_bias: bool = True,
     ) -> None:
         self._judge = pairwise_judge
@@ -232,7 +231,7 @@ class TournamentEvaluator:
 
     def run_dataset(
         self,
-        data: list[dict],
+        data: list[dict[str, object]],
         systems: Mapping[str, Callable[..., str]],
     ) -> TournamentReport:
         """
@@ -278,11 +277,14 @@ class TournamentEvaluator:
                     score_sums[b][a] += vb.score
 
                     if va.score > vb.score:
-                        wins[a][b] += 1; losses[b][a] += 1
+                        wins[a][b] += 1
+                        losses[b][a] += 1
                     elif vb.score > va.score:
-                        wins[b][a] += 1; losses[a][b] += 1
+                        wins[b][a] += 1
+                        losses[a][b] += 1
                     else:
-                        ties[a][b] += 1; ties[b][a] += 1
+                        ties[a][b] += 1
+                        ties[b][a] += 1
 
                     if self._detect_positional_bias:
                         # Round 2: B first (swapped)
@@ -333,13 +335,13 @@ class TournamentEvaluator:
         standings: list[TournamentStanding] = []
         for name in system_names:
             w = sum(wins[name][o] for o in system_names if o != name)
-            l = sum(losses[name][o] for o in system_names if o != name)
+            ls = sum(losses[name][o] for o in system_names if o != name)
             t = sum(ties[name][o] for o in system_names if o != name)
-            total_games = w + l + t
+            total_games = w + ls + t
             standings.append(TournamentStanding(
                 system=name,
                 elo=round(elo_ratings[name], 1),
-                wins=w, losses=l, ties=t,
+                wins=w, losses=ls, ties=t,
                 win_rate=round(w / total_games, 4) if total_games else 0.0,
             ))
 

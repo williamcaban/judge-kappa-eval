@@ -6,6 +6,7 @@ Accepts list[{"inputs": {...}, "expectations": {...}}].
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from judge_kappa.adapters.base import InputAdapter
 from judge_kappa.models import EvalCase
@@ -13,7 +14,7 @@ from judge_kappa.models import EvalCase
 
 class DatasetAdapter(InputAdapter):
     def load(self, source: object) -> list[EvalCase]:
-        data: list[dict] = source  # type: ignore[assignment]
+        data: list[dict[str, Any]] = source  # type: ignore[assignment]
         cases: list[EvalCase] = []
         for i, row in enumerate(data):
             inputs = row.get("inputs", {})

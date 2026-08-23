@@ -17,10 +17,13 @@ Install tiktoken for accurate token counts: pip install tiktoken
 
 from __future__ import annotations
 
+from typing import Any
+
 from scipy import stats
 
 from judge_kappa.bias.base import BiasDetector
 from judge_kappa.models import BiasResult, JudgeVerdict
+
 
 class VerbosityBiasDetector(BiasDetector):
     """
@@ -38,7 +41,7 @@ class VerbosityBiasDetector(BiasDetector):
         self._threshold = threshold
         self._encoding = tiktoken_encoding
 
-    def detect(self, **kwargs) -> BiasResult:
+    def detect(self, **kwargs: Any) -> BiasResult:
         verdicts: list[JudgeVerdict] = kwargs["verdicts"]
 
         scores = [v.score for v in verdicts]
@@ -55,8 +58,8 @@ class VerbosityBiasDetector(BiasDetector):
             return BiasResult()
 
         result = stats.spearmanr(lengths, scores)
-        rho_f = float(result.statistic)  # type: ignore[attr-defined]
-        p_f   = float(result.pvalue)     # type: ignore[attr-defined]
+        rho_f = float(result.statistic)
+        p_f   = float(result.pvalue)
         biased = abs(rho_f) > self._threshold and p_f < 0.05
 
         return BiasResult(

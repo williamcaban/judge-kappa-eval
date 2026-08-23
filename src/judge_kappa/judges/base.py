@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 from abc import ABC, abstractmethod
+from typing import Any
 
 from judge_kappa.llm.base import LLMBackend
 from judge_kappa.models import CalibrationExample, EvalCase, JudgeVerdict
@@ -49,11 +50,11 @@ class LLMJudge(ABC):
         return self._backend.complete(system, user, self._temperature)
 
     @staticmethod
-    def _parse_json(text: str) -> dict:
+    def _parse_json(text: str) -> dict[str, Any]:
         match = re.search(r"\{.*\}", text, re.DOTALL)
         raw = match.group(0) if match else text
         try:
-            return json.loads(raw)
+            return json.loads(raw)  # type: ignore[no-any-return]
         except json.JSONDecodeError:
             return {"_raw": text}
 

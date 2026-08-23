@@ -18,8 +18,8 @@ from pathlib import Path
 
 import yaml
 
-from judge_kappa.cli.config_schema import DatasetModeConfig, SkillModeConfig
 from judge_kappa.cli.builder import build_evaluator, load_dataset
+from judge_kappa.cli.config_schema import DatasetModeConfig, SkillModeConfig
 from judge_kappa.models import EvalReport
 
 
@@ -32,6 +32,7 @@ def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig:
         return DatasetModeConfig.model_validate(raw)
     else:
         _die(f"Config 'mode' must be 'skill' or 'dataset', got: {mode!r}")
+    raise RuntimeError("unreachable")
 
 
 def _render_text(report: EvalReport) -> str:
@@ -135,7 +136,8 @@ def cmd_validate(config_path: str) -> None:
 def cmd_schema() -> None:
     """Print merged JSON Schema for both config modes."""
     import json
-    from judge_kappa.cli.config_schema import SkillModeConfig, DatasetModeConfig
+
+    from judge_kappa.cli.config_schema import DatasetModeConfig, SkillModeConfig
 
     skill_schema   = SkillModeConfig.model_json_schema()
     dataset_schema = DatasetModeConfig.model_json_schema()
@@ -176,11 +178,14 @@ def app() -> None:
         i = 0
         while i < len(rest):
             if rest[i] == "--output" and i + 1 < len(rest):
-                output_file = rest[i + 1]; i += 2
+                output_file = rest[i + 1]
+                i += 2
             elif rest[i] == "--format" and i + 1 < len(rest):
-                fmt = rest[i + 1]; i += 2
+                fmt = rest[i + 1]
+                i += 2
             elif rest[i] == "--verdicts":
-                include_verdicts = True; i += 1
+                include_verdicts = True
+                i += 1
             else:
                 _die(f"Unknown argument: {rest[i]}")
 

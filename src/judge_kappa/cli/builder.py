@@ -12,21 +12,20 @@ from pathlib import Path
 from judge_kappa.cli.config_schema import (
     BackendConfig,
     CalibrationConfig,
-    DatasetModeConfig,
     JudgeConfig,
     JuryEvalConfig,
     PanelConfig,
     PositionalJudgeConfig,
     RubricDimensionConfig,
-    SkillModeConfig,
+    VariantConfig,
 )
 from judge_kappa.evaluator import JuryEvaluator
 from judge_kappa.judges.assertion import AssertionJudge
 from judge_kappa.judges.base import LLMJudge
 from judge_kappa.judges.pairwise import PairwiseJudge
 from judge_kappa.judges.rubric import RubricJudge
-from judge_kappa.llm.base import LLMBackend
 from judge_kappa.llm.anthropic_backend import AnthropicBackend
+from judge_kappa.llm.base import LLMBackend
 from judge_kappa.llm.openai_backend import OpenAIBackend
 from judge_kappa.models import (
     AggregationStrategy,
@@ -37,7 +36,6 @@ from judge_kappa.models import (
 )
 from judge_kappa.panel.jury import JudgeJury
 from judge_kappa.panel.panel import JudgePanel
-
 
 _PROVIDER_DEFAULT_ENV: dict[str, str] = {
     "anthropic": "ANTHROPIC_API_KEY",
@@ -109,12 +107,12 @@ def _build_judge(cfg: JudgeConfig) -> LLMJudge:
     )
 
 
-def _build_panel(cfg: PanelConfig):
+def _build_panel(cfg: PanelConfig) -> JudgeJury | JudgePanel:
     judges = [_build_judge(j) for j in cfg.judges]
     strategy = AggregationStrategy(cfg.strategy)
     if cfg.type == "jury":
         weights = [j.weight for j in cfg.judges]
-        return JudgeJury(jurors=list(zip(judges, weights)), strategy=strategy)
+        return JudgeJury(jurors=list(zip(judges, weights, strict=True)), strategy=strategy)
     weights = [j.weight for j in cfg.judges]
     return JudgePanel(judges=judges, strategy=strategy, weights=weights)
 
@@ -128,7 +126,7 @@ def _build_positional_judge(cfg: PositionalJudgeConfig) -> PairwiseJudge:
     )
 
 
-def _build_variant(cfg, skill_md: str | None = None) -> Variant:
+def _build_variant(cfg: VariantConfig, skill_md: str | None = None) -> Variant:
     per_variant_backend = (
         _build_backend(cfg.generation.backend) if cfg.generation else None
     )
@@ -158,7 +156,7 @@ def build_evaluator(config: JuryEvalConfig) -> JuryEvaluator:
     )
 
 
-def load_dataset(path: str) -> list[dict]:
+def load_dataset(path: str) -> list[dict[str, object]]:
     """Load JSONL (one JSON object per line) or JSON array."""
     text = Path(path).read_text()
     try:

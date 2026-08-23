@@ -93,8 +93,8 @@ def compute_icc(verdicts: list[JudgeVerdict]) -> tuple[float, str]:
     denom = MS_between + (MS_rater - MS_error) / n
     if denom <= 0:
         return 0.0, "degenerate — all cases scored identically"
-    icc = (MS_between - MS_error) / denom
-    icc = float(np.clip(icc, -1.0, 1.0))
+    icc_raw = (MS_between - MS_error) / denom
+    icc = float(np.clip(icc_raw, -1.0, 1.0))
     return round(icc, 4), _interpret_icc(icc)
 
 

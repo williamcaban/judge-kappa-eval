@@ -31,8 +31,8 @@ Pairwise mode produces PairwiseReport.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
 
 import numpy as np
 
@@ -124,7 +124,7 @@ def _run_variant(variant: Variant, case: EvalCase, default_backend: LLMBackend) 
         inputs = case.metadata.get("inputs", {"prompt": case.prompt})
         return variant.predict_fn(inputs)
 
-    backend: LLMBackend = variant.generation_backend or default_backend  # type: ignore[assignment]
+    backend: LLMBackend = variant.generation_backend or default_backend
     parts: list[str] = []
     if variant.system_prompt:
         parts.append(variant.system_prompt)
@@ -140,7 +140,7 @@ class JuryEvaluator:
         panel: EvaluationPanel,
         generation_backend: LLMBackend,
         scale_type: ScaleType = ScaleType.ORDINAL,
-        positional_judge: Optional[PairwiseJudge] = None,
+        positional_judge: PairwiseJudge | None = None,
         verbosity_bias_threshold: float = 0.30,
         compute_significance: bool = True,
         compute_icc: bool = True,
@@ -171,8 +171,8 @@ class JuryEvaluator:
     def evaluate_skill(
         self,
         skill_dir: str | Path,
-        control_variant: Optional[Variant] = None,
-        treatment_variant: Optional[Variant] = None,
+        control_variant: Variant | None = None,
+        treatment_variant: Variant | None = None,
     ) -> EvalReport:
         adapter = SkillAdapter()
         cases, skill_md = adapter.load_with_context(skill_dir)
@@ -182,11 +182,11 @@ class JuryEvaluator:
 
     def evaluate_dataset(
         self,
-        data: list[dict],
+        data: list[dict[str, object]],
         predict_fn: Callable[..., str],
-        rubric: Optional[list[RubricDimension]] = None,
-        control_variant: Optional[Variant] = None,
-        treatment_variant: Optional[Variant] = None,
+        rubric: list[RubricDimension] | None = None,
+        control_variant: Variant | None = None,
+        treatment_variant: Variant | None = None,
     ) -> EvalReport:
         """
         MLflow LLMaJ compatible. Calls predict_fn(inputs) to generate each output.
@@ -229,7 +229,7 @@ class JuryEvaluator:
 
     def evaluate_prerecorded(
         self,
-        data: list[dict],
+        data: list[dict[str, object]],
         control_output_field: str = "output_control",
         treatment_output_field: str = "output_treatment",
         control_label: str = "control",
@@ -255,13 +255,13 @@ class JuryEvaluator:
         cases = DatasetAdapter().load(data)
 
         def _make_prerecorded_fn(field: str) -> Callable[..., str]:
-            def _fn(inputs: dict) -> str:
-                return inputs.get(field) or inputs.get("output") or ""
+            def _fn(inputs: dict[str, object]) -> str:
+                return str(inputs.get(field) or inputs.get("output") or "")
             return _fn
 
         # Stash the pre-recorded outputs inside each case's metadata so
         # _run_variant() can retrieve them via predict_fn.
-        for case, row in zip(cases, data):
+        for case, row in zip(cases, data, strict=True):
             inputs_with_outputs = {**case.metadata.get("inputs", {})}
             if control_output_field in row:
                 inputs_with_outputs[control_output_field] = row[control_output_field]
@@ -283,8 +283,8 @@ class JuryEvaluator:
 
     def evaluate_pairwise_dataset(
         self,
-        data: list[dict],
-        pairwise_judge: "PairwiseJudge",
+        data: list[dict[str, object]],
+        pairwise_judge: PairwiseJudge,
         output_a_field: str = "output_a",
         output_b_field: str = "output_b",
         label_a: str = "A",
@@ -307,13 +307,15 @@ class JuryEvaluator:
         results: list[PairwiseCaseResult] = []
 
         for i, row in enumerate(data):
+            inputs_obj = row.get("inputs", {})
+            inputs: dict[str, object] = inputs_obj if isinstance(inputs_obj, dict) else {}
             case = EvalCase(
-                id=row.get("id", f"pair-{i:04d}"),
-                prompt=row.get("prompt", row.get("inputs", {}).get("question", "")),
-                metadata=row,
+                id=str(row.get("id", f"pair-{i:04d}")),
+                prompt=str(row.get("prompt", inputs.get("question", ""))),
+                metadata=dict(row),
             )
-            out_a = row.get(output_a_field, "")
-            out_b = row.get(output_b_field, "")
+            out_a = str(row.get(output_a_field, ""))
+            out_b = str(row.get(output_b_field, ""))
 
             va, vb = pairwise_judge.judge_pair(case, out_a, out_b, label_a, label_b)
             preferred = label_a if va.score > vb.score else (

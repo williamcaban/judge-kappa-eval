@@ -16,6 +16,7 @@ score_instability = mean absolute delta in per-variant scores between rounds —
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from judge_kappa.bias.base import BiasDetector
 from judge_kappa.judges.pairwise import PairwiseJudge
@@ -66,7 +67,7 @@ class PositionalBiasDetector(BiasDetector):
             treatment_scores=(vb_r1.score, va_r2.score),
         )
 
-    def detect(self, **kwargs) -> BiasResult:
+    def detect(self, **kwargs: Any) -> BiasResult:
         reports: list[PositionalBiasReport] = kwargs["reports"]
         rate = (
             sum(1 for r in reports if r.positional_flip) / len(reports)

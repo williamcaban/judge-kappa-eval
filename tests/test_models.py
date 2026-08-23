@@ -48,7 +48,8 @@ class TestVariant:
         assert v.temperature == 0.0
 
     def test_predict_fn_allowed(self):
-        fn = lambda _: "output"
+        def fn(_: object) -> str:
+            return "output"
         v = Variant(name="treatment", predict_fn=fn)
         assert v.predict_fn is fn
 

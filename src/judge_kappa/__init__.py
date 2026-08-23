@@ -13,8 +13,25 @@ Quick start:
   print(report.mean_uplift, report.agreement.alpha)
 """
 
+from judge_kappa.adapters import DatasetAdapter, InputAdapter, SkillAdapter
+from judge_kappa.agreement import (
+    AgreementMetric,
+    BehavioralAlignmentMetric,
+    CohenKappa,
+    KrippendorffAlpha,
+    PersonFitAnalyzer,
+)
+from judge_kappa.bias import (
+    BiasDetector,
+    DifferentialItemFunctioningDetector,
+    PositionalBiasDetector,
+    PositionalBiasReport,
+    VerbosityBiasDetector,
+)
+from judge_kappa.calibration import IRTJudgeWeighter
 from judge_kappa.evaluator import JuryEvaluator
-from judge_kappa.tournament import TournamentEvaluator, TournamentReport, TournamentStanding, PairResult
+from judge_kappa.judges import AssertionJudge, LLMJudge, PairwiseJudge, RankJudge, RubricJudge
+from judge_kappa.llm import AnthropicBackend, LLMBackend, OpenAIBackend
 from judge_kappa.models import (
     AggregationStrategy,
     AgreementResult,
@@ -34,25 +51,13 @@ from judge_kappa.models import (
     Variant,
     VariantResult,
 )
-from judge_kappa.adapters import DatasetAdapter, InputAdapter, SkillAdapter
-from judge_kappa.judges import AssertionJudge, LLMJudge, PairwiseJudge, RubricJudge, RankJudge
-from judge_kappa.llm import AnthropicBackend, LLMBackend, OpenAIBackend
 from judge_kappa.panel import EvaluationPanel, JudgeJury, JudgePanel
-from judge_kappa.agreement import (
-    AgreementMetric,
-    BehavioralAlignmentMetric,
-    CohenKappa,
-    KrippendorffAlpha,
-    PersonFitAnalyzer,
+from judge_kappa.tournament import (
+    PairResult,
+    TournamentEvaluator,
+    TournamentReport,
+    TournamentStanding,
 )
-from judge_kappa.bias import (
-    BiasDetector,
-    DifferentialItemFunctioningDetector,
-    PositionalBiasDetector,
-    PositionalBiasReport,
-    VerbosityBiasDetector,
-)
-from judge_kappa.calibration import IRTJudgeWeighter
 
 __all__ = [
     # Evaluator
@@ -78,4 +83,6 @@ __all__ = [
     "PositionalBiasDetector", "PositionalBiasReport", "VerbosityBiasDetector",
     # Calibration
     "IRTJudgeWeighter",
+    # Tournament
+    "TournamentEvaluator", "TournamentReport", "TournamentStanding", "PairResult",
 ]

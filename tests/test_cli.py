@@ -8,16 +8,13 @@ without running actual evaluations (which require LLM calls).
 from __future__ import annotations
 
 import json
-import sys
 from io import StringIO
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 import yaml
 
 from judge_kappa.cli.config_schema import DatasetModeConfig, SkillModeConfig
-
 
 # ── Config schema validation ──────────────────────────────────────────────────
 
@@ -130,20 +127,20 @@ class TestCLIValidateCommand:
         config_path = tmp_path / "config.yaml"
         config_path.write_text(yaml.dump(MINIMAL_SKILL_CONFIG))
         captured = StringIO()
-        with patch("sys.argv", ["jury-eval", "validate", str(config_path)]):
-            with patch("sys.stdout", captured):
-                from judge_kappa.cli.main import app
-                app()
+        with patch("sys.argv", ["jury-eval", "validate", str(config_path)]), \
+                patch("sys.stdout", captured):
+            from judge_kappa.cli.main import app
+            app()
         assert "valid" in captured.getvalue()
 
     def test_validate_invalid_config_exits(self, tmp_path):
         bad_config = {"mode": "skill"}  # missing required fields
         config_path = tmp_path / "bad.yaml"
         config_path.write_text(yaml.dump(bad_config))
-        with patch("sys.argv", ["jury-eval", "validate", str(config_path)]):
-            with pytest.raises(SystemExit) as exc:
-                from judge_kappa.cli.main import app
-                app()
+        with patch("sys.argv", ["jury-eval", "validate", str(config_path)]), \
+                pytest.raises(SystemExit) as exc:
+            from judge_kappa.cli.main import app
+            app()
         assert exc.value.code != 0
 
 
@@ -177,24 +174,23 @@ class TestCLIHelpAndErrors:
         assert "Usage" in out
 
     def test_unknown_command_exits(self):
-        with patch("sys.argv", ["jury-eval", "unknown-cmd"]):
-            with pytest.raises(SystemExit) as exc:
-                from judge_kappa.cli.main import app
-                app()
+        with patch("sys.argv", ["jury-eval", "unknown-cmd"]), \
+                pytest.raises(SystemExit) as exc:
+            from judge_kappa.cli.main import app
+            app()
         assert exc.value.code != 0
 
     def test_run_missing_config_arg_exits(self):
-        with patch("sys.argv", ["jury-eval", "run"]):
-            with pytest.raises(SystemExit) as exc:
-                from judge_kappa.cli.main import app
-                app()
+        with patch("sys.argv", ["jury-eval", "run"]), pytest.raises(SystemExit) as exc:
+            from judge_kappa.cli.main import app
+            app()
         assert exc.value.code != 0
 
     def test_invalid_format_exits(self, tmp_path):
         config_path = tmp_path / "config.yaml"
         config_path.write_text(yaml.dump(MINIMAL_SKILL_CONFIG))
-        with patch("sys.argv", ["jury-eval", "run", str(config_path), "--format", "xml"]):
-            with pytest.raises(SystemExit) as exc:
-                from judge_kappa.cli.main import app
-                app()
+        with patch("sys.argv", ["jury-eval", "run", str(config_path), "--format", "xml"]), \
+                pytest.raises(SystemExit) as exc:
+            from judge_kappa.cli.main import app
+            app()
         assert exc.value.code != 0

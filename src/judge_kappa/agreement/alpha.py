@@ -21,8 +21,8 @@ Scale notes:
 
 from __future__ import annotations
 
-import numpy as np
 import krippendorff
+import numpy as np
 
 from judge_kappa.agreement.base import AgreementMetric
 from judge_kappa.models import AgreementResult, JudgeVerdict, ScaleType

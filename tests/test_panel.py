@@ -16,7 +16,6 @@ from judge_kappa.panel.jury import JudgeJury
 from judge_kappa.panel.panel import JudgePanel
 from tests.conftest import MockLLMBackend, make_verdict
 
-
 # ── JudgePanel ────────────────────────────────────────────────────────────────
 
 

@@ -24,6 +24,7 @@ Usage:
 from __future__ import annotations
 
 import textwrap
+from typing import Any
 
 from judge_kappa.judges.base import LLMJudge
 from judge_kappa.models import EvalCase, JudgeVerdict
@@ -54,7 +55,7 @@ class RankJudge(LLMJudge):
             if exceeded. Default 12. Above ~15 outputs, context quality degrades.
     """
 
-    def __init__(self, *args, max_systems: int = 12, **kwargs) -> None:
+    def __init__(self, *args: Any, max_systems: int = 12, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._max_systems = max_systems
 
@@ -91,18 +92,19 @@ class RankJudge(LLMJudge):
 
         names = list(system_outputs.keys())
         labels = [chr(ord("A") + i) for i in range(len(names))]
-        label_to_name = dict(zip(labels, names))
+        label_to_name = dict(zip(labels, names, strict=True))
 
         outputs_section = "\n\n".join(
             f"## Output {label}\n{system_outputs[name]}"
-            for label, name in zip(labels, names)
+            for label, name in zip(labels, names, strict=True)
         )
         system = _SYSTEM.format(icl_block=self._icl_block())
         user = f"## Prompt\n{case.prompt}\n\n{outputs_section}"
 
         parsed = self._parse_json(self._call(system, user))
-        raw_rankings: dict[str, int] = parsed.get("rankings", {})
-        rationale: str = parsed.get("rationale", parsed.get("_raw", ""))
+        rankings_raw = parsed.get("rankings") or {}
+        raw_rankings: dict[str, int] = {k: int(v) for k, v in rankings_raw.items()}
+        rationale: str = str(parsed.get("rationale", parsed.get("_raw", "")))
 
         # Normalise: rank 1 → score 1.0, rank N → score 0.0
         n = len(names)

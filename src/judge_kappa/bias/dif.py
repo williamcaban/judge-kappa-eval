@@ -28,6 +28,7 @@ Returns a list of DIF-flagged case IDs and per-case statistics.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
@@ -90,10 +91,10 @@ class DifferentialItemFunctioningDetector(BiasDetector):
         self._min_per_case = min_verdicts_per_case
         self._min_groups = min_groups
 
-    def detect(self, **kwargs) -> BiasResult:
+    def detect(self, **kwargs: Any) -> BiasResult:
         """Returns a minimal BiasResult. For full DIF details use analyze()."""
         verdicts: list[JudgeVerdict] = kwargs["verdicts"]
-        report = self.analyze(verdicts)
+        self.analyze(verdicts)
         return BiasResult()  # DIF doesn't map to existing BiasResult fields
 
     def analyze(self, verdicts: list[JudgeVerdict]) -> DIFReport:

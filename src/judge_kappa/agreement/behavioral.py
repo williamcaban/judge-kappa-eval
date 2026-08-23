@@ -62,7 +62,7 @@ class BehavioralAlignmentMetric:
     ) -> AgreementResult:
         result = self._alpha_metric.compute(verdicts, scale_type)
         interp = (
-            _interpret_behavioral(result.alpha)  # type: ignore[arg-type]
+            _interpret_behavioral(result.alpha or 0.0)
             if result.alpha is not None
             else "insufficient data"
         )

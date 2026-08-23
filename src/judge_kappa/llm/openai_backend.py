@@ -5,15 +5,13 @@ and any server that exposes /v1/chat/completions.
 
 from __future__ import annotations
 
-from typing import Optional
-
 
 class OpenAIBackend:
     def __init__(
         self,
         model: str,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> None:
         try:
             from openai import OpenAI

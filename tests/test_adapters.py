@@ -5,11 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import pytest
-
 from judge_kappa.adapters.dataset import DatasetAdapter
 from judge_kappa.adapters.skill import SkillAdapter
-
 
 # ── SkillAdapter ──────────────────────────────────────────────────────────────
 

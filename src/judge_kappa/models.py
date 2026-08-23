@@ -7,13 +7,14 @@ Adding fields here is additive (backward compatible); removing or renaming is br
 
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 
-class ScaleType(str, Enum):
+class ScaleType(StrEnum):
     """Measurement scale — governs which Krippendorff distance function is used."""
     NOMINAL = "nominal"
     ORDINAL = "ordinal"
@@ -21,7 +22,7 @@ class ScaleType(str, Enum):
     RATIO = "ratio"
 
 
-class AggregationStrategy(str, Enum):
+class AggregationStrategy(StrEnum):
     MEAN = "mean"
     WEIGHTED_MEAN = "weighted_mean"
     MAJORITY_VOTE = "majority_vote"
@@ -56,7 +57,7 @@ class EvalCase(BaseModel):
     id: str
     prompt: str
     assertions: list[Assertion] = Field(default_factory=list)
-    expected_output: Optional[str] = None
+    expected_output: str | None = None
     files: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -71,12 +72,12 @@ class Variant(BaseModel):
       3. JuryEvaluator.generation_backend — shared fallback backend
     """
     name: str
-    system_prompt: Optional[str] = None
-    skill_context: Optional[str] = None
+    system_prompt: str | None = None
+    skill_context: str | None = None
     model: str = "gpt-4o"
     temperature: float = 0.0
-    predict_fn: Optional[Callable[..., str]] = None
-    generation_backend: Optional[Any] = None  # LLMBackend; typed as Any to avoid circular import
+    predict_fn: Callable[..., str] | None = None
+    generation_backend: Any | None = None  # LLMBackend; typed as Any to avoid circular import
 
     class Config:
         arbitrary_types_allowed = True
@@ -104,14 +105,14 @@ class VariantResult(BaseModel):
 
 
 class AgreementResult(BaseModel):
-    kappa: Optional[float] = None
-    alpha: Optional[float] = None
-    alpha_ci_low: Optional[float] = None   # bootstrap 95% CI lower bound
-    alpha_ci_high: Optional[float] = None  # bootstrap 95% CI upper bound
-    icc: Optional[float] = None            # ICC(2,k) absolute agreement
-    icc_interpretation: Optional[str] = None
-    expected_chance_agreement: Optional[float] = None
-    alpha_interpretation: Optional[str] = None
+    kappa: float | None = None
+    alpha: float | None = None
+    alpha_ci_low: float | None = None   # bootstrap 95% CI lower bound
+    alpha_ci_high: float | None = None  # bootstrap 95% CI upper bound
+    icc: float | None = None            # ICC(2,k) absolute agreement
+    icc_interpretation: str | None = None
+    expected_chance_agreement: float | None = None
+    alpha_interpretation: str | None = None
     n_judges: int = 0
     n_cases: int = 0
 
@@ -125,8 +126,8 @@ class JudgeFitResult(BaseModel):
 
 class BiasResult(BaseModel):
     positional_bias_rate: float = 0.0          # fraction of cases with position flip
-    verbosity_bias_rho: Optional[float] = None  # Spearman ρ(length, score)
-    verbosity_bias_p: Optional[float] = None
+    verbosity_bias_rho: float | None = None  # Spearman ρ(length, score)
+    verbosity_bias_p: float | None = None
     verbosity_biased: bool = False
 
 
@@ -158,7 +159,7 @@ class EvalReport(BaseModel):
     mean_control_score: float
     mean_treatment_score: float
     agreement: AgreementResult
-    significance: Optional[UpliftSignificance] = None   # McNemar + bootstrap CI
+    significance: UpliftSignificance | None = None   # McNemar + bootstrap CI
     judge_fit: list[JudgeFitResult] = Field(default_factory=list)  # per-judge l_z
     bias: BiasResult
     judge_ids: list[str]

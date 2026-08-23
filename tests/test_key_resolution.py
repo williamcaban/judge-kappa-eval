@@ -65,15 +65,13 @@ class TestResolveApiKey:
 
     def test_custom_var_missing_raises_valueerror(self):
         env = {k: v for k, v in os.environ.items() if k != "MY_CUSTOM_KEY"}
-        with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="MY_CUSTOM_KEY"):
-                _resolve_api_key("MY_CUSTOM_KEY", "openai")
+        with patch.dict(os.environ, env, clear=True), pytest.raises(ValueError, match="MY_CUSTOM_KEY"):
+            _resolve_api_key("MY_CUSTOM_KEY", "openai")
 
     def test_error_message_includes_export_hint(self):
         env = {k: v for k, v in os.environ.items() if k != "GROQ_API_KEY"}
-        with patch.dict(os.environ, env, clear=True):
-            with pytest.raises(ValueError, match="export GROQ_API_KEY"):
-                _resolve_api_key("GROQ_API_KEY", "openai")
+        with patch.dict(os.environ, env, clear=True), pytest.raises(ValueError, match="export GROQ_API_KEY"):
+            _resolve_api_key("GROQ_API_KEY", "openai")
 
     def test_custom_var_works_for_groq(self):
         with patch.dict(os.environ, {"GROQ_API_KEY": "gsk-groq-test"}):
