@@ -220,16 +220,113 @@ See [docs/05-key-management.md](05-key-management.md) for the `api_key_env` fiel
 
 ---
 
+## 10 — Psychometric analytics (bootstrap CI, ICC, person-fit, DIF, McNemar)
+
+**When to use:** scientific reporting, compliance submissions, or any situation where "α = 0.77" is insufficient and you need confidence intervals, variance decomposition, and significance testing.  
+**Script:** `examples/demo_psychometric.py`  
+**No API key required** — runs entirely on synthetic verdicts.
+
+```bash
+python examples/demo_psychometric.py
+```
+
+Expected output (abridged):
+```
+1. Bootstrap 95% CI for Krippendorff's α
+  Krippendorff's α:  0.7312
+  95% CI:            [0.6101, 0.8312]
+  Interpretation:    tentative conclusions (0.67 ≤ α < 0.80)
+
+2. ICC(2,k) — between-cases vs. between-judges variance
+  ICC(2,k): 0.7418  → good reliability (0.60 ≤ ICC < 0.75)
+
+3. PersonFitAnalyzer — outfit MNSQ t-statistic per judge
+  stable-1           t=  0.231    no
+  stable-2           t=  0.189    no
+  erratic            t=  3.847  ⚠  YES
+
+4. BehavioralAlignmentMetric — DISC-style condition sensitivity
+  Consistent model:  α = 0.9821  → behaviorally consistent across conditions
+  Sensitive model:   α = 0.1203  → high condition sensitivity
+
+5. DifferentialItemFunctioningDetector — case-level bias
+  DIF-flagged cases: ['case-5', 'case-6', 'case-7', 'case-8', 'case-9']
+
+6. McNemar significance test + bootstrap CI for mean uplift
+  Mean uplift:        +0.2533
+  95% bootstrap CI:   [+0.1687, +0.3353]
+  McNemar χ²:         8.0667
+  p-value:            0.0045  → significant (p < 0.05)
+```
+
+Full reference: [docs/10-psychometric-methods.md](10-psychometric-methods.md)
+
+---
+
+## 11 — IRT-based judge weighting
+
+**When to use:** you have human-validated calibration examples and want panel weights grounded in measured reliability rather than hand-tuned values.  
+**Script:** `examples/demo_irt_weighting.py`  
+**No API key required** — uses synthetic calibration data.
+
+```bash
+python examples/demo_irt_weighting.py
+```
+
+Expected output (abridged):
+```
+IRT Judge Weighting — Results
+Judge                   θ (ability)    Weight
+claude-reliable           1.2341      0.3412
+gpt4-reliable             1.1203      0.3088
+gpt4o-moderate            0.7891      0.2217
+small-noisy              -0.1234      0.0891
+lenient-biased           -0.9812      0.0392
+```
+
+---
+
+## 12 — RankJudge (listwise ranking, N ≥ 7 systems)
+
+**When to use:** comparing 7 or more systems where round-robin pairwise scoring is cost-prohibitive.  
+**Script:** `examples/demo_rank_judge.py`  
+**No API key required** — uses `MockRankBackend`.
+
+```bash
+python examples/demo_rank_judge.py
+```
+
+Expected output (abridged):
+```
+Cost comparison: 8 systems × 5 cases
+  TournamentEvaluator (pairwise):   280 judge calls
+  RankJudge (listwise):               5 judge calls
+  Reduction:                         98%
+
+RankJudge Leaderboard
+Rank  System               Mean score  GT rank
+   1  gpt-4o                   0.8750        1 ✓
+   2  claude-sonnet             0.7500        2 ✓
+   3  gemini-1.5-pro            0.6250        3 ✓
+   ...
+Spearman ρ with ground truth: 0.9167  (p=0.0007)
+```
+
+---
+
 ## Example files index
 
-| Config file | Mode | Panel type | Judge type | Special |
-|---|---|---|---|---|
-| `config_skill_minimal.yaml` | skill | panel | assertion | single judge, no bias detection |
-| `config_skill.yaml` | skill | panel | assertion | 3 judges + ICL calibration |
-| `config_dataset.yaml` | dataset | jury | rubric | diverse rubrics, weighted_mean |
-| `config_dataset_panel.yaml` | dataset | panel | rubric | same rubric on 3 judges |
-| `config_endpoints.yaml` | skill | panel | assertion | per-variant generation backend |
-| `config_prerecorded.yaml` | dataset | panel | rubric | no generation model |
-| `config_pairwise.yaml` | pairwise | — | pairwise | PairwiseReport output |
-| `config_regulatory.yaml` | skill | panel | assertion | positional + verbosity bias |
-| `config_mixed_panel.yaml` | skill | panel | assertion | 4 providers in one panel |
+| File | Type | API key? | What it shows |
+|---|---|---|---|
+| `config_skill_minimal.yaml` | YAML config | yes | single judge, minimum config |
+| `config_skill.yaml` | YAML config | yes | 3-judge panel + ICL calibration |
+| `config_dataset.yaml` | YAML config | yes | JudgeJury + diverse rubrics |
+| `config_dataset_panel.yaml` | YAML config | yes | homogeneous panel, rubric consistency |
+| `config_endpoints.yaml` | YAML config | yes | per-variant generation backends |
+| `config_prerecorded.yaml` | YAML config | yes | pre-recorded outputs, no generation |
+| `config_pairwise.yaml` | YAML config | yes | pairwise preference rates |
+| `config_regulatory.yaml` | YAML config | yes | positional + verbosity bias for compliance |
+| `config_mixed_panel.yaml` | YAML config | yes | 4 providers in one panel |
+| `demo_psychometric.py` | Python script | **no** | CIs, ICC, person-fit, DIF, McNemar |
+| `demo_irt_weighting.py` | Python script | **no** | IRT judge weighting from calibration data |
+| `demo_rank_judge.py` | Python script | **no** | listwise ranking for N ≥ 7 systems |
