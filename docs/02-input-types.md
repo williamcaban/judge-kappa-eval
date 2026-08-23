@@ -13,7 +13,8 @@ judge-kappa has six entry points covering every way you might have system output
 | `evaluate_endpoints` | Two live OpenAI-compatible endpoints | Yes — one call per variant per case | `EvalReport` (uplift) |
 | `evaluate_prerecorded` | Outputs already in the dataset | **No** | `EvalReport` (uplift) |
 | `evaluate_pairwise_dataset` | Pre-recorded A/B pairs | **No** | `PairwiseReport` (preference rates) |
-| `TournamentEvaluator` | N systems (callables or endpoints) | Only if using `run_endpoints` | `TournamentReport` (Elo leaderboard) |
+| `TournamentEvaluator` | N ≤ 6 systems (callables or endpoints) | Only if using `run_endpoints` | `TournamentReport` (Elo leaderboard) |
+| `RankJudge.rank()` | N ≥ 7 systems, listwise (v0.2) | Caller generates; judge ranks | `dict[system → JudgeVerdict]` |
 
 ---
 
@@ -131,7 +132,7 @@ See [docs/03-pairwise-tournament.md](03-pairwise-tournament.md) for full detail.
 
 ---
 
-### `TournamentEvaluator` — N-system Elo leaderboard
+### `TournamentEvaluator` — N-system Elo leaderboard (N ≤ 6)
 You have 3–6 systems to rank. Runs every pair through `PairwiseJudge` (round-robin) and derives Elo ratings.
 
 ```python
@@ -153,6 +154,28 @@ See [docs/03-pairwise-tournament.md](03-pairwise-tournament.md) for full detail.
 
 ---
 
+### `RankJudge.rank()` — listwise ranking for N ≥ 7 (v0.2)
+You have 7 or more systems and pairwise cost is prohibitive. `RankJudge` presents all N outputs to the judge in one prompt per case — O(N) calls instead of O(N²).
+
+```python
+from judge_kappa import RankJudge, AnthropicBackend
+from collections import defaultdict
+
+judge = RankJudge("rank-j", AnthropicBackend("claude-sonnet-4-6"), max_systems=12)
+
+scores: dict[str, list[float]] = defaultdict(list)
+for case in eval_cases:
+    outputs = {sys: generate(sys, case.prompt) for sys in systems}
+    for sys, verdict in judge.rank(case, outputs).items():
+        scores[sys].append(verdict.score)
+
+leaderboard = sorted(scores.items(), key=lambda x: -sum(x[1]) / len(x[1]))
+```
+
+See [docs/03-pairwise-tournament.md](03-pairwise-tournament.md) § RankJudge for full detail, cost tables, and the recommended 3-step workflow.
+
+---
+
 ## EvalReport vs PairwiseReport vs TournamentReport
 
 ### `EvalReport` — A/B uplift modes
@@ -160,14 +183,22 @@ Produced by: `evaluate_skill`, `evaluate_dataset`, `evaluate_endpoints`, `evalua
 
 Key fields:
 ```
-mean_uplift          : +0.234    signed delta (treatment − control)
-mean_control_score   : 0.512
-mean_treatment_score : 0.746
-agreement.alpha      : 0.812     Krippendorff's α across judges and cases
-agreement.kappa      : 0.791     Cohen's κ (mean pairwise)
-bias.positional_bias_rate : 0.083
-bias.verbosity_bias_rho   : 0.091
-cases[]              : per-case results with per-judge verdicts
+mean_uplift              : +0.234    signed delta (treatment − control)
+mean_control_score       : 0.512
+mean_treatment_score     : 0.746
+agreement.alpha          : 0.812     Krippendorff's α across judges and cases
+agreement.alpha_ci_low   : 0.701     bootstrap 95% CI lower bound (v0.2)
+agreement.alpha_ci_high  : 0.889     bootstrap 95% CI upper bound (v0.2)
+agreement.icc            : 0.831     ICC(2,k) absolute agreement (v0.2)
+agreement.kappa          : 0.791     Cohen's κ (mean pairwise)
+significance.p_value     : 0.009     McNemar p-value (v0.2)
+significance.significant : true      p < 0.05 (v0.2)
+significance.uplift_ci_low  : 0.120  bootstrap CI for mean_uplift (v0.2)
+significance.uplift_ci_high : 0.348
+judge_fit[]              : per-judge outfit MNSQ t-statistic (v0.2)
+bias.positional_bias_rate    : 0.083
+bias.verbosity_bias_rho      : 0.091
+cases[]                  : per-case results with per-judge verdicts
 ```
 
 Use when you need a continuous quality difference you can track over time.

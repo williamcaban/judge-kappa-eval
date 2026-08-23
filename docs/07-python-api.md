@@ -20,6 +20,7 @@ from judge_kappa import (
     AssertionJudge,
     RubricJudge,
     PairwiseJudge,
+    RankJudge,                  # v0.2: listwise ranking for N ≥ 7 systems
 
     # Panels
     JudgePanel,    # homogeneous rubric — measures inter-rater agreement
@@ -37,20 +38,28 @@ from judge_kappa import (
     # Models (output)
     EvalReport,
     PairwiseReport,
-    AgreementResult,
+    AgreementResult,    # v0.2: + alpha_ci_low/high, icc, icc_interpretation
     BiasResult,
     CaseResult,
     VariantResult,
     JudgeVerdict,
     PairwiseCaseResult,
+    UpliftSignificance,     # v0.2: McNemar + bootstrap CI for mean_uplift
+    JudgeFitResult,         # v0.2: per-judge outfit MNSQ t-statistic
 
     # Agreement metrics
-    KrippendorffAlpha,
+    KrippendorffAlpha,          # v0.2: + bootstrap_ci parameter
     CohenKappa,
+    PersonFitAnalyzer,          # v0.2: judge consistency detection
+    BehavioralAlignmentMetric,  # v0.2: cross-condition consistency (DISC-style)
 
     # Bias detectors
     PositionalBiasDetector,
     VerbosityBiasDetector,
+    DifferentialItemFunctioningDetector,  # v0.2: per-case DIF analysis
+
+    # Calibration
+    IRTJudgeWeighter,   # v0.2: 2PL IRT-based panel weights from calibration data
 
     # Adapters
     SkillAdapter,
@@ -305,17 +314,157 @@ openrouter_backend = OpenAIBackend(
 
 ---
 
+## Pattern 9 — McNemar significance + bootstrap CI (v0.2)
+
+```python
+ev = JuryEvaluator(
+    panel=panel,
+    generation_backend=backend,
+    compute_significance=True,   # default True
+    bootstrap_ci=True,           # CI for α and uplift; default True
+    n_bootstrap=2000,
+)
+report = ev.evaluate(cases, control, treatment)
+
+sig = report.significance
+print(f"Uplift:   {report.mean_uplift:+.4f}")
+print(f"95% CI:   [{sig.uplift_ci_low:+.4f}, {sig.uplift_ci_high:+.4f}]")
+print(f"McNemar:  χ²={sig.mcnemar_statistic:.3f}  p={sig.p_value:.4f}  {'✓ significant' if sig.significant else '✗ not significant'}")
+print(f"Wins:     treatment={sig.n_treatment_wins}  control={sig.n_control_wins}  ties={sig.n_ties}")
+```
+
+---
+
+## Pattern 10 — IRT-based judge weighting (v0.2)
+
+```python
+from judge_kappa import IRTJudgeWeighter, JudgePanel, AggregationStrategy
+
+# Step 1: collect human-validated calibration scores
+human_scores = [0.95, 0.10, 0.65, 0.50, 0.80, 0.20, 0.70, 0.45]
+judge_responses = {
+    "claude-j": [0.93, 0.12, 0.63, 0.52, 0.78, 0.22, 0.68, 0.47],
+    "gpt4-j":   [0.89, 0.18, 0.60, 0.55, 0.75, 0.30, 0.65, 0.52],
+    "llama-j":  [0.75, 0.40, 0.58, 0.60, 0.65, 0.45, 0.55, 0.60],
+}
+
+# Step 2: fit 2PL IRT model
+weighter = IRTJudgeWeighter(tolerance=0.20)
+weighter.fit(judge_responses, human_scores)
+
+weights = weighter.weights()    # softmax(θ) — sums to 1.0
+theta   = weighter.theta()      # latent reliability per judge
+
+# Step 3: pass weights to JudgePanel
+panel = JudgePanel(
+    judges=[claude_judge, gpt4_judge, llama_judge],
+    strategy=AggregationStrategy.WEIGHTED_MEAN,
+    weights=[weights["claude-j"], weights["gpt4-j"], weights["llama-j"]],
+)
+```
+
+---
+
+## Pattern 11 — RankJudge for N ≥ 7 systems (v0.2)
+
+```python
+from judge_kappa import RankJudge, AnthropicBackend
+from collections import defaultdict
+
+judge = RankJudge("rank-j", AnthropicBackend("claude-sonnet-4-6"), max_systems=12)
+
+scores: dict[str, list[float]] = defaultdict(list)
+for case in eval_cases:
+    outputs = {sys: generate(sys, case) for sys in systems}
+    for sys, verdict in judge.rank(case, outputs).items():
+        scores[sys].append(verdict.score)    # rank 1 → 1.0, rank N → 0.0
+
+leaderboard = sorted(scores.items(), key=lambda x: -sum(x[1]) / len(x[1]))
+for rank, (sys, s) in enumerate(leaderboard, 1):
+    print(f"{rank}. {sys}  mean={sum(s)/len(s):.4f}")
+```
+
+---
+
+## Pattern 12 — DIF analysis (v0.2)
+
+```python
+from judge_kappa import DifferentialItemFunctioningDetector
+
+# After running evaluate(), collect all verdicts
+all_verdicts = [v for c in report.cases for v in c.verdicts]
+
+detector = DifferentialItemFunctioningDetector(
+    alpha_threshold=0.05,
+    min_verdicts_per_case=4,
+    min_groups=2,
+)
+dif_report = detector.analyze(all_verdicts)
+
+print(dif_report.summary())
+for r in dif_report.per_case:
+    if r.flagged:
+        print(f"  DIF case: {r.case_id}  β={r.group_coefficient:.3f}  p={r.p_value:.4f}")
+```
+
+---
+
+## Pattern 13 — Behavioral alignment metric (v0.2)
+
+```python
+from judge_kappa import BehavioralAlignmentMetric
+from judge_kappa.models import ScaleType
+
+# Score the same cases under different prompting conditions
+condition_scores = {
+    "zero_shot":        {f"case-{i}": score_0shot[i]  for i in range(n)},
+    "system_prompted":  {f"case-{i}": score_system[i] for i in range(n)},
+    "chain_of_thought": {f"case-{i}": score_cot[i]    for i in range(n)},
+}
+
+metric = BehavioralAlignmentMetric(bootstrap_ci=True)
+verdicts = BehavioralAlignmentMetric.from_condition_scores(condition_scores)
+result = metric.compute(verdicts, ScaleType.INTERVAL)
+
+print(f"α = {result.alpha:.4f}  [{result.alpha_ci_low:.4f}, {result.alpha_ci_high:.4f}]")
+print(result.alpha_interpretation)
+# "behaviorally consistent across conditions (α ≥ 0.80)"
+# or "high condition sensitivity — framing materially changes outputs (α < 0.67)"
+```
+
+---
+
 ## Accessing output report fields
 
 ```python
 report = evaluator.evaluate_skill("./my-skill")
 
-# Corpus-level
+# Corpus-level agreement (v0.2: + CI and ICC)
 report.mean_uplift                        # float: treatment − control
 report.agreement.alpha                    # Krippendorff's α
+report.agreement.alpha_ci_low            # 95% bootstrap CI lower bound (v0.2)
+report.agreement.alpha_ci_high           # 95% bootstrap CI upper bound (v0.2)
 report.agreement.alpha_interpretation     # "strong agreement (α ≥ 0.80)"
 report.agreement.kappa                    # Cohen's κ (mean pairwise)
+report.agreement.icc                      # ICC(2,k) absolute agreement (v0.2)
+report.agreement.icc_interpretation       # "excellent reliability (ICC ≥ 0.75)" (v0.2)
 report.agreement.expected_chance_agreement # P(e)
+
+# Significance (v0.2)
+report.significance.mcnemar_statistic     # McNemar χ²
+report.significance.p_value              # Wald p-value
+report.significance.significant          # bool: p < 0.05
+report.significance.uplift_ci_low        # bootstrap 95% CI lower bound
+report.significance.uplift_ci_high       # bootstrap 95% CI upper bound
+report.significance.n_treatment_wins     # cases where treatment > control
+
+# Per-judge fit (v0.2)
+for jf in report.judge_fit:
+    jf.judge_id
+    jf.lz_statistic          # outfit MNSQ t-statistic
+    jf.flagged_inconsistent  # bool: |t| > 1.96
+
+# Bias
 report.bias.positional_bias_rate          # fraction of cases with A/B flip
 report.bias.verbosity_bias_rho            # Spearman ρ(length, score)
 report.bias.verbosity_biased              # bool

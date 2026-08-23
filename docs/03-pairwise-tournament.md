@@ -1,6 +1,6 @@
-# Pairwise and Tournament Modes
+# Pairwise, Tournament, and Listwise Ranking Modes
 
-Both modes use `PairwiseJudge` — a judge that scores two outputs in a single prompt and returns which was preferred. They differ in scope and cost.
+All three modes use a judge that compares outputs. They differ in scope, cost, and how many systems they handle.
 
 ---
 
@@ -9,10 +9,11 @@ Both modes use `PairwiseJudge` — a judge that scores two outputs in a single p
 | Mode | Systems | Judge calls / case | Output | Best for |
 |---|---|---|---|---|
 | **Pairwise** | Exactly 2 | 2 (with bias detection) | `PairwiseReport` | A/B preference; RLHF; regulatory evidence |
-| **Tournament** | N ≥ 3 | N(N−1) (with bias detection) | `TournamentReport` | Leaderboards; model selection |
-| **Champion-challenger** | N ≥ 7 | 2(N−1) | Per-pair `PairwiseReport` | Large-scale ranking, cost-constrained |
+| **Tournament** | 3–6 | N(N−1) (with bias detection) | `TournamentReport` | Leaderboards; model selection |
+| **RankJudge** | 7–12 | 1 | Per-case `dict[system → JudgeVerdict]` | Large N, cost-constrained; first-pass ranking |
+| **Champion-challenger** | Any N | 2(N−1) | Per-pair `PairwiseReport` | Incremental model selection; very large N |
 
-Both modes operate on **pre-recorded outputs** — outputs already written to the dataset. Neither calls a generation model during comparison. Use `evaluate_endpoints` first if you need to generate outputs from live endpoints, then pass the results.
+All modes operate on **pre-recorded or generated outputs**. Use `evaluate_endpoints` or `run_endpoints` first if you need to generate outputs from live endpoints, then compare.
 
 ---
 
@@ -27,7 +28,7 @@ Both modes operate on **pre-recorded outputs** — outputs already written to th
 - You are submitting comparative evidence to an audit or regulatory body
 
 **Do NOT use pairwise when:**
-- You have 3 or more systems to rank → use Tournament
+- You have 3 or more systems to rank → use Tournament or RankJudge
 - You need a continuous quality score, not a preference rate → use `evaluate_prerecorded` with `EvalReport`
 
 ### Dataset format
@@ -82,7 +83,7 @@ The evaluator runs each case in both orders:
 - Round 1: judge sees (A, B)
 - Round 2: judge sees (B, A) — swapped
 
-A positionally biased judge always prefers whichever output appears first, regardless of content. Check `positional_bias_rate` across all cases.
+A positionally biased judge always prefers whichever output appears **first**, regardless of content. A positional flip is flagged when the first-positioned output wins in **both** orderings (not just when the winner changes).
 
 ```python
 # Per-case breakdown
@@ -98,7 +99,7 @@ for case in report.cases:
 
 ---
 
-## Tournament mode
+## Tournament mode (3–6 systems)
 
 ### When to use
 
@@ -109,7 +110,7 @@ for case in report.cases:
 - You are making a model selection decision ("which of these 4 candidates should we promote?")
 
 **Do NOT use tournament when:**
-- You have 7+ systems and cost is a concern → use champion-challenger
+- You have 7+ systems and cost is a concern → use RankJudge (first pass) or champion-challenger (incremental)
 - You only have 2 systems → use pairwise (same result, cleaner API)
 - You need absolute quality scores, not relative rankings → use `evaluate_prerecorded` with a rubric panel
 
@@ -127,9 +128,9 @@ tournament = TournamentEvaluator(
 report = tournament.run_dataset(
     data=my_eval_dataset,
     systems={
-        "rag-v1":      lambda inputs: rag_v1(inputs["question"]),
-        "rag-v2":      lambda inputs: rag_v2(inputs["question"]),
-        "rag-v3":      lambda inputs: rag_v3(inputs["question"]),
+        "rag-v1":       lambda inputs: rag_v1(inputs["question"]),
+        "rag-v2":       lambda inputs: rag_v2(inputs["question"]),
+        "rag-v3":       lambda inputs: rag_v3(inputs["question"]),
         "rag-baseline": lambda inputs: baseline(inputs["question"]),
     },
 )
@@ -213,9 +214,100 @@ Options:
 
 ---
 
-## Champion-challenger pattern (N ≥ 7)
+## RankJudge — listwise ranking for N ≥ 7
 
-Full round-robin becomes expensive past N=6. Instead, run each challenger only against the current champion.
+`RankJudge` presents all N outputs to the judge in a single prompt and receives a ranking JSON. This is O(N) in judge calls vs O(N²) for `TournamentEvaluator`.
+
+### When to use
+
+**Use RankJudge when:**
+- You have 7–12 systems and pairwise cost is prohibitive
+- You want a first-pass ranking before running targeted pairwise comparisons on the top-k
+- Context window permits fitting all N outputs in one prompt
+
+**Do NOT use RankJudge when:**
+- You need per-pair positional bias rates (no A/B swap is run)
+- N × mean_output_length exceeds the judge model's context window
+- You need the accuracy of head-to-head comparisons (pairwise is more precise)
+
+### Cost comparison
+
+| N systems | M cases | TournamentEvaluator (N(N−1)×M×2) | RankJudge (M×1) | Reduction |
+|---|---|---|---|---|
+| 7 | 20 | 1680 calls | 20 calls | **98.8%** |
+| 8 | 20 | 2240 calls | 20 calls | **99.1%** |
+| 10 | 20 | 3600 calls | 20 calls | **99.4%** |
+| 12 | 20 | 5280 calls | 20 calls | **99.6%** |
+
+### Python API
+
+```python
+from judge_kappa import RankJudge, AnthropicBackend
+from judge_kappa.models import EvalCase
+from collections import defaultdict
+
+judge = RankJudge(
+    "rank-judge",
+    AnthropicBackend("claude-sonnet-4-6"),
+    max_systems=12,     # hard cap; raise only if context window allows
+)
+
+# Score one case across all systems in a single call
+system_outputs = {
+    "system-a": "Output from system A...",
+    "system-b": "Output from system B...",
+    # ... up to max_systems
+}
+verdicts = judge.rank(case, system_outputs)
+# verdicts: dict[system_name → JudgeVerdict]
+# scores: rank 1 → 1.0, rank N → 0.0 (normalised)
+
+# Build a leaderboard across many cases
+scores_by_system: dict[str, list[float]] = defaultdict(list)
+for case in eval_cases:
+    outputs = {sys: generate(sys, case) for sys in systems}
+    for sys, verdict in judge.rank(case, outputs).items():
+        scores_by_system[sys].append(verdict.score)
+
+leaderboard = sorted(
+    [(sys, sum(s) / len(s)) for sys, s in scores_by_system.items()],
+    key=lambda x: -x[1],
+)
+for rank, (sys, score) in enumerate(leaderboard, 1):
+    print(f"{rank}. {sys}  mean_score={score:.4f}")
+```
+
+### Rank-to-score conversion
+
+Rank 1 (best) → score 1.0; rank N (worst) → score 0.0.
+
+```
+score_i = (N - rank_i) / (N - 1)
+```
+
+This preserves ordinal information while producing `JudgeVerdict` scores compatible with the standard `AgreementResult` / `EvalReport` pipeline.
+
+### Trade-offs vs. TournamentEvaluator
+
+| Aspect | RankJudge | TournamentEvaluator |
+|---|---|---|
+| Judge calls per case | 1 | N(N−1) / 2 × 2 (with bias detection) |
+| Positional bias detection | None — no swap test | Per-pair bias rate reported |
+| Context window pressure | Grows with N × output length | Fixed (2 outputs per call) |
+| Accuracy | Slightly lower (one listwise judgment) | Higher (independent pairwise votes) |
+| Best for | N ≥ 7, first-pass screening | N ≤ 6, final model selection |
+
+### Recommended workflow for N ≥ 7
+
+1. **RankJudge** all N systems → identify top-k (k = 3–5)
+2. **TournamentEvaluator** on top-k only → precise Elo within the finalists
+3. **Pairwise** on champion vs. runner-up → regulatory-grade evidence
+
+---
+
+## Champion-challenger pattern (any N, incremental)
+
+Full round-robin becomes expensive past N=6. Instead, run each challenger only against the current champion. Best for incremental model selection where a new candidate is evaluated against the current best without re-running all prior comparisons.
 
 ```python
 from judge_kappa import JuryEvaluator, PairwiseJudge, AnthropicBackend
@@ -260,13 +352,14 @@ print(f"Final champion: {champion}")
 
 ### Judge calls (evaluation only, not generation)
 
-| Mode | Formula | N=2, M=20 | N=3, M=20 | N=4, M=20 | N=5, M=20 | N=6, M=20 |
+| Mode | Formula | N=2, M=20 | N=4, M=20 | N=6, M=20 | N=8, M=20 | N=10, M=20 |
 |---|---|---|---|---|---|---|
 | Pairwise, no bias detection | M | 20 | — | — | — | — |
 | Pairwise, with bias detection | 2M | **40** | — | — | — | — |
-| Tournament, no bias detection | C(N,2) × M | — | 60 | 120 | 200 | 300 |
-| Tournament, with bias detection | N(N−1) × M | — | **120** | **240** | **400** | **600** |
-| Champion-challenger, with bias | 2(N−1) × M | — | 80 | 120 | 160 | 200 |
+| Tournament, no bias detection | C(N,2) × M | — | 120 | 300 | 560 | 900 |
+| Tournament, with bias detection | N(N−1) × M | — | **240** | **600** | **1120** | **1800** |
+| RankJudge (listwise) | M | — | **20** | **20** | **20** | **20** |
+| Champion-challenger, with bias | 2(N−1) × M | — | 120 | 200 | 280 | 360 |
 
 ### Total calls including output generation
 
@@ -276,6 +369,7 @@ Only relevant when using `run_endpoints` (live generation). Pre-recorded modes h
 |---|---|---|---|---|
 | Pairwise (generate + judge, with bias) | 2M (gen) + 2M (judge) | **80** | — | — |
 | Tournament (generate + judge, with bias) | N×M (gen) + N(N−1)×M (judge) | — | **320** | **720** |
+| RankJudge (generate + judge) | N×M (gen) + M (judge) | — | **100** | **140** |
 | Champion-challenger (generate + judge, with bias) | N×M (gen) + 2(N−1)×M (judge) | — | **200** | **320** |
 
 ### Cost reduction strategies
@@ -284,6 +378,7 @@ Only relevant when using `run_endpoints` (live generation). Pre-recorded modes h
 |---|---|---|---|
 | Skip bias detection | `detect_positional_bias=False` | 50% judge calls | Positional bias undetected |
 | Pre-record outputs first | Run generation separately, reuse | Avoid re-generating per run | Outputs may become stale |
+| RankJudge first pass | Score all N in one call, then pairwise top-k | O(N) first pass | Less precision than full pairwise |
 | Champion-challenger | Only (challenger vs champion) per round | O(N) instead of O(N²) | May miss non-transitive rankings |
 | Fewer cases | Use representative subset | Linear reduction | Wider confidence intervals |
 | Cheaper judge model | `claude-haiku` or `gpt-4o-mini` | 60–80% cost reduction | Potentially lower quality |
@@ -302,7 +397,13 @@ How many systems?
 │          Full round-robin: all C(N,2) pairs compared
 │          Cost: N(N−1) × M × 2 judge calls
 │
-└─ 7+  → Champion-challenger
-           Each challenger vs current champion only
-           Cost: (N−1) × 2M judge calls (linear)
+└─ 7+  → Choose by situation:
+           │
+           ├─ Quick first-pass, cost-sensitive
+           │   → RankJudge (listwise, 1 judge call per case)
+           │   → Then pairwise on top-k finalists
+           │
+           └─ Incremental evaluation (new model vs current best)
+               → Champion-challenger (N−1 pairwise comparisons)
+               → Cost: (N−1) × 2M judge calls (linear)
 ```

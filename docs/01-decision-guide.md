@@ -74,10 +74,19 @@ Use this tree to pick the right mode for your situation.
 │   → TournamentEvaluator
 │   See: docs/03-pairwise-tournament.md
 │
-└─ 7+ systems  ───────────────────────────────────────────────── Champion-challenger
-    Run each challenger only against the current champion.
-    Linear cost O(N) instead of quadratic O(N²).
-    See: docs/03-pairwise-tournament.md § Champion-challenger pattern
+└─ 7+ systems  — choose by situation:
+    │
+    ├─ Quick first-pass / cost-constrained  ─────────────────── RankJudge
+    │   All N outputs ranked in one prompt per case. O(N) calls.
+    │   Then run TournamentEvaluator on top-k finalists.
+    │   → RankJudge(judge, backend, max_systems=12)
+    │   → examples/demo_rank_judge.py
+    │   See: docs/03-pairwise-tournament.md § RankJudge
+    │
+    └─ Incremental (new model vs current best)  ─────────────── Champion-challenger
+        Run each challenger only against the current champion.
+        Cost: (N−1) × 2M judge calls (linear).
+        See: docs/03-pairwise-tournament.md § Champion-challenger
 ```
 
 ---
@@ -93,9 +102,44 @@ Anthropic + OpenRouter + vLLM + Ollama in one panel?
 
 ---
 
+## Q6 — Do you need statistical rigor or scientific reporting?
+
+```
+├─ Confidence intervals on agreement (α)
+│   → KrippendorffAlpha(bootstrap_ci=True, n_bootstrap=2000)
+│   → AgreementResult.alpha_ci_low / alpha_ci_high
+│
+├─ Significance test for uplift
+│   → JuryEvaluator(compute_significance=True)
+│   → EvalReport.significance (McNemar χ² + bootstrap CI)
+│
+├─ Why do judges disagree? (systematic bias vs. random noise)
+│   → ICC(2,k) via compute_icc(verdicts)
+│   → AgreementResult.icc / icc_interpretation
+│
+├─ Which specific judges are unreliable?
+│   → PersonFitAnalyzer().analyze(verdicts)
+│   → EvalReport.judge_fit  (per-judge outfit MNSQ t-statistic)
+│
+├─ IRT-derived weights instead of hand-tuned panel weights
+│   → IRTJudgeWeighter().fit(judge_scores, human_scores).weights()
+│
+├─ Which eval cases are biased toward a judge model family?
+│   → DifferentialItemFunctioningDetector().analyze(verdicts)
+│
+└─ Cross-condition consistency (does prompt framing change model behavior?)
+    → BehavioralAlignmentMetric().compute(condition_verdicts)
+
+See: docs/10-psychometric-methods.md  (full guide)
+     examples/demo_psychometric.py    (runnable, no API key)
+     examples/demo_irt_weighting.py   (runnable, no API key)
+```
+
+---
+
 ## Quick reference
 
-| Goal | Mode | Config example |
+| Goal | Mode / class | Reference |
 |---|---|---|
 | Skill evaluation (minimal) | skill + assertion + 1 judge | `config_skill_minimal.yaml` |
 | Skill + rubric clarity check | skill + assertion + panel | `config_skill.yaml` |
@@ -104,6 +148,12 @@ Anthropic + OpenRouter + vLLM + Ollama in one panel?
 | Compare two live endpoints | endpoints + assertion + panel | `config_endpoints.yaml` |
 | Score pre-recorded outputs | prerecorded + rubric + panel | `config_prerecorded.yaml` |
 | A/B preference rates | pairwise | `config_pairwise.yaml` |
-| N-system leaderboard | tournament | Python API |
+| N-system leaderboard (N ≤ 6) | TournamentEvaluator | Python API |
+| N-system ranking (N ≥ 7) | RankJudge | `demo_rank_judge.py` |
 | Regulatory evidence | skill/dataset + regulatory config | `config_regulatory.yaml` |
 | Mixed providers (4 backends) | any panel/jury | `config_mixed_panel.yaml` |
+| Bootstrap CI for α | KrippendorffAlpha(bootstrap_ci=True) | `demo_psychometric.py` |
+| McNemar significance test | JuryEvaluator(compute_significance=True) | `demo_psychometric.py` |
+| IRT judge weighting | IRTJudgeWeighter | `demo_irt_weighting.py` |
+| DIF case-level bias | DifferentialItemFunctioningDetector | `demo_psychometric.py` |
+| Behavioral alignment | BehavioralAlignmentMetric | `demo_psychometric.py` |
