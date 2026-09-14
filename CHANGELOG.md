@@ -11,9 +11,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- Reference-value and synthetic-recovery tests for all nine agreement/bias/
-  calibration capabilities, closing a gap where 5 of 9 (ICC, PersonFit, DIF,
-  IRT, BehavioralAlignment) had zero test coverage and the remaining 4
+- Reference-value and synthetic-recovery tests for eight agreement/bias/
+  calibration capabilities, closing a gap where 5 (ICC, PersonFit, DIF, IRT,
+  BehavioralAlignment) had zero test coverage and the remaining 3
   (Krippendorff's α, Cohen's κ, McNemar) were tested only against internal
   invariants rather than literature or hand-derived reference values.
   - `KrippendorffAlpha` / `BehavioralAlignmentMetric`: validated against the
@@ -27,9 +27,12 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - McNemar (`_mcnemar_and_ci`): validated against hand-computed
     continuity-corrected chi-square values for significant and
     non-significant cases.
-  - `IRTJudgeWeighter`: validated via simulation-based parameter recovery
-    (known judge-reliability ranking correctly recovered from synthetic
-    data).
+  - `IRTJudgeWeighter`: validated via synthetic reliability-ranking
+    recovery (a known judge-reliability ordering is correctly recovered
+    from synthetic data). This does not validate 2PL item-parameter
+    (discrimination/difficulty) or theta-magnitude recovery — see the
+    `TestIRTJudgeWeighter` docstring in `tests/test_psychometrics.py` for
+    what a full item-parameter-recovery test would additionally need.
   - `PersonFitAnalyzer`, `DifferentialItemFunctioningDetector`: unit tests
     plus documented findings — both modules have a design property
     (detailed in test docstrings) that currently prevents a clean

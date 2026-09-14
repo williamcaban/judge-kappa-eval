@@ -11,8 +11,16 @@ modules, using whichever validation method the module supports:
   - ICC            -> literature reference value (Shrout & Fleiss 1979)
   - BehavioralAlignment -> same literature dataset as Krippendorff's alpha
                             (it *is* Krippendorff's alpha, relabeled)
-  - IRT            -> synthetic parameter recovery (standard IRT software
-                       validation technique — see e.g. Chalmers 2012, mirt)
+  - IRT            -> synthetic reliability-ranking recovery: judges with a
+                       known, deliberately ranked true reliability are fit
+                       and the resulting theta ordering is checked. This
+                       does NOT validate 2PL item-parameter (discrimination,
+                       difficulty) or theta-magnitude recovery — the
+                       generative process here is Gaussian noise on
+                       continuous scores, thresholded into binary responses
+                       by fit(), not simulation from known 2PL probabilities.
+                       A true item-parameter-recovery test would need the
+                       latter.
   - PersonFit      -> hand-computed unit test of the pure helper function,
                        plus documented findings (see class docstring)
   - DIF            -> hand-computed unit test + documented findings (see
@@ -151,17 +159,27 @@ class TestBehavioralAlignmentMetric:
 
 class TestIRTJudgeWeighter:
     """
-    2PL IRT has no single "correct number" to check against literature —
-    the validation technique standard psychometric software uses instead
-    (e.g. the R `mirt` package's own test suite) is simulation-based
-    parameter recovery: generate data from judges with a KNOWN, deliberately
-    ranked reliability ordering, fit the model, and check that ordering is
-    recovered.
+    2PL IRT has no single "correct number" to check against literature.
+    Standard psychometric software validates itself instead via
+    simulation-based *item-parameter* recovery (e.g. the R `mirt` package's
+    own test suite): generate binary responses directly from known 2PL
+    probabilities P(correct) = sigmoid(a*(theta - b)), fit, and check that
+    the fitted theta/a/b are close to the true values.
 
-    theta has scale/sign indeterminacy under MLE with near-separable data
-    (one judge here reaches theta=21, an MLE artifact of near-perfect
-    accuracy, not a meaningful magnitude) — so this test checks rank order
-    and the resulting panel weights, not absolute theta values.
+    This test does a lighter-weight version of that idea, scoped to what
+    `IRTJudgeWeighter.fit()` actually validates end-to-end: it generates
+    *continuous* judge scores as Gaussian noise around a human reference
+    (not from known 2PL response probabilities), which `fit()` then
+    thresholds into binary correct/incorrect internally. It checks only
+    that the resulting fitted theta *ranking* recovers a deliberately
+    constructed true reliability ordering (excellent > good > poor >
+    random) — it does NOT verify recovery of item discrimination (a),
+    item difficulty (b), or theta magnitude, and theta itself has
+    scale/sign indeterminacy under MLE with near-separable data (one judge
+    here reaches theta=21, an MLE artifact of near-perfect accuracy, not a
+    meaningful magnitude). A full item-parameter-recovery test would need
+    to generate from known 2PL probabilities directly, bypassing the
+    tolerance-based binarization in `fit()`.
     """
 
     def test_recovers_true_reliability_ranking(self):
