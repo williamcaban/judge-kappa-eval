@@ -12,15 +12,17 @@ import json
 
 import pytest
 
-from judge_kappa.evaluator import JuryEvaluator
+from judge_kappa.evaluator import JuryEvaluator, _mcnemar_and_ci
 from judge_kappa.judges.assertion import AssertionJudge
 from judge_kappa.judges.rubric import RubricJudge
 from judge_kappa.models import (
     Assertion,
+    CaseResult,
     EvalCase,
     RubricDimension,
     ScaleType,
     Variant,
+    VariantResult,
 )
 from judge_kappa.panel.panel import JudgePanel
 from tests.conftest import MockLLMBackend
@@ -326,3 +328,63 @@ class TestEvaluatePairwiseDataset:
         report = ev.evaluate_pairwise_dataset(data=data, pairwise_judge=judge)
 
         assert report.preference_rate_a > 0.6  # A should be preferred
+
+
+def _case_result_with_uplift(uplift: float) -> CaseResult:
+    """Minimal CaseResult — only `uplift` matters for _mcnemar_and_ci."""
+    return CaseResult(
+        case_id="c",
+        uplift=uplift,
+        control=VariantResult(variant_name="control", output="o", score=0.5, token_count=10),
+        treatment=VariantResult(variant_name="treatment", output="o", score=0.5 + uplift, token_count=10),
+        verdicts=[],
+    )
+
+
+class TestMcNemarSignificance:
+    """
+    Reference-value checks for `_mcnemar_and_ci`'s continuity-corrected
+    McNemar statistic (Edwards 1948): chi2 = (|b - c| - 1)^2 / (b + c),
+    p = chi2.sf(chi2, df=1).
+
+    These are closed-form values computed directly from the formula the
+    function itself cites in its docstring — independent of the function's
+    internal win/loss counting, which is exercised separately by asserting
+    on n_treatment_wins / n_control_wins here rather than assuming it.
+    """
+
+    def test_non_significant_case_matches_hand_computed_chi2(self):
+        # b=9 treatment wins, c=3 control wins, 3 ties.
+        # chi2 = (|9-3|-1)^2 / 12 = 25/12 = 2.0833 -> p = 0.1489 (not significant)
+        results = (
+            [_case_result_with_uplift(0.3)] * 9
+            + [_case_result_with_uplift(-0.2)] * 3
+            + [_case_result_with_uplift(0.0)] * 3
+        )
+        sig = _mcnemar_and_ci(results, n_bootstrap=200)
+        assert sig.n_treatment_wins == 9
+        assert sig.n_control_wins == 3
+        assert sig.n_ties == 3
+        assert sig.mcnemar_statistic == pytest.approx(2.0833, abs=0.0001)
+        assert sig.p_value == pytest.approx(0.1489, abs=0.0001)
+        assert sig.significant is False
+
+    def test_significant_case_matches_hand_computed_chi2(self):
+        # b=20 treatment wins, c=5 control wins, 5 ties.
+        # chi2 = (|20-5|-1)^2 / 25 = 196/25 = 7.84 -> p = 0.0051 (significant)
+        results = (
+            [_case_result_with_uplift(0.3)] * 20
+            + [_case_result_with_uplift(-0.2)] * 5
+            + [_case_result_with_uplift(0.0)] * 5
+        )
+        sig = _mcnemar_and_ci(results, n_bootstrap=200)
+        assert sig.mcnemar_statistic == pytest.approx(7.84, abs=0.0001)
+        assert sig.p_value == pytest.approx(0.0051, abs=0.0001)
+        assert sig.significant is True
+
+    def test_all_ties_gives_zero_statistic_and_p_one(self):
+        results = [_case_result_with_uplift(0.0)] * 5
+        sig = _mcnemar_and_ci(results, n_bootstrap=50)
+        assert sig.mcnemar_statistic == 0.0
+        assert sig.p_value == 1.0
+        assert sig.significant is False

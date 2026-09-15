@@ -29,6 +29,21 @@ def _verdicts(scores_by_judge: dict[str, dict[str, float]]):
     return result
 
 
+# Canonical Krippendorff's alpha worked example: 3 coders (A, B, C) rating
+# 15 units on a 1-4 scale with missing data. Reproduced verbatim (unit
+# ordering u1..u15) from https://en.wikipedia.org/wiki/Krippendorff%27s_alpha
+# and from the `fast-krippendorff` package's own sample.py, both of which
+# attribute it to Krippendorff (2011). `None` = coder did not rate that unit.
+_KRIPPENDORFF_REFERENCE_DATA: dict[str, dict[str, float]] = {
+    judge: {f"u{i + 1}": score for i, score in enumerate(scores) if score is not None}
+    for judge, scores in {
+        "A": [None, None, None, None, None, 3, 4, 1, 2, 1, 1, 3, 3, None, 3],
+        "B": [1, None, 2, 1, 3, 3, 4, 3, None, None, None, None, None, None, None],
+        "C": [None, None, 2, 1, 3, 4, 4, None, 2, 1, 1, 3, 3, None, 4],
+    }.items()
+}
+
+
 # ── Krippendorff's α ─────────────────────────────────────────────────────────
 
 
@@ -91,6 +106,41 @@ class TestKrippendorffAlpha:
         assert result.n_judges == 3
         assert result.n_cases == 2
 
+    # ── Reference-value validation ──────────────────────────────────────────
+    #
+    # The tests above only check invariants (perfect agreement -> ~1, random
+    # -> ~0, bounds). They would still pass if the underlying disagreement
+    # computation were off by a constant or a sign. This test instead feeds
+    # the canonical Krippendorff worked example (3 coders, 15 units) through
+    # the full JudgeVerdict -> KrippendorffAlpha pipeline and checks the
+    # output against the published alpha values, catching bugs in
+    # `_build_matrix` (data marshaling) as well as the wrapped `krippendorff`
+    # package call itself.
+    #
+    # Source: Krippendorff (2011), "Computing Krippendorff's Alpha-Reliability",
+    # reproduced at https://en.wikipedia.org/wiki/Krippendorff%27s_alpha
+    # (article states alpha=0.691 nominal, alpha=0.811 interval for this
+    # exact dataset; ordinal is not stated there and is instead cross-checked
+    # directly against the `krippendorff` PyPI package on the same matrix).
+
+    def test_matches_canonical_worked_example_nominal(self):
+        v = _verdicts(_KRIPPENDORFF_REFERENCE_DATA)
+        result = KrippendorffAlpha(bootstrap_ci=False).compute(v, ScaleType.NOMINAL)
+        assert result.alpha == pytest.approx(0.691, abs=0.001)
+
+    def test_matches_canonical_worked_example_interval(self):
+        v = _verdicts(_KRIPPENDORFF_REFERENCE_DATA)
+        result = KrippendorffAlpha(bootstrap_ci=False).compute(v, ScaleType.INTERVAL)
+        assert result.alpha == pytest.approx(0.811, abs=0.001)
+
+    def test_matches_canonical_worked_example_ordinal(self):
+        # No published value in the Wikipedia article for ordinal on this
+        # dataset; cross-checked against `krippendorff.alpha()` called
+        # directly on the same matrix (verifies data marshaling only).
+        v = _verdicts(_KRIPPENDORFF_REFERENCE_DATA)
+        result = KrippendorffAlpha(bootstrap_ci=False).compute(v, ScaleType.ORDINAL)
+        assert result.alpha == pytest.approx(0.8067, abs=0.0001)
+
 
 # ── Cohen's κ ─────────────────────────────────────────────────────────────────
 
@@ -140,3 +190,36 @@ class TestCohenKappa:
         result = CohenKappa().compute(v, ScaleType.ORDINAL)
         # No pairs with ≥2 shared cases — kappa is None or computed from 0 pairs
         assert result.n_judges == 2
+
+    def test_matches_hand_derived_reference_value(self):
+        """
+        Reference-value check, not just invariants.
+
+        10-item, 3-category contingency table (categories 0/1/2, counts 3/3/4
+        for both raters by construction, so both marginals are identical):
+
+            rater1: 0 0 0 1 1 1 2 2 2 2
+            rater2: 0 0 1 1 1 2 2 2 2 0
+
+        Po (observed agreement) = 7/10 = 0.70
+        Pe (chance agreement)   = (3/10)^2 + (3/10)^2 + (4/10)^2 = 0.34
+        kappa = (Po - Pe) / (1 - Pe) = (0.70 - 0.34) / (1 - 0.34) = 0.5455
+
+        Cross-checked directly against sklearn.metrics.cohen_kappa_score
+        (the library CohenKappa wraps) on the same raw labels — this test
+        additionally validates the score->category discretization in
+        CohenKappa.compute() (categories mapped to bin centers 0.1/0.5/0.9
+        so _discretize recovers them exactly: bins 0, 2, 4 of 5).
+        """
+        category_to_score = {0: 0.1, 1: 0.5, 2: 0.9}
+        r1 = [0, 0, 0, 1, 1, 1, 2, 2, 2, 2]
+        r2 = [0, 0, 1, 1, 1, 2, 2, 2, 2, 0]
+
+        v = []
+        for i, (a, b) in enumerate(zip(r1, r2, strict=True)):
+            v.append(make_verdict("j1", f"c{i}", category_to_score[a]))
+            v.append(make_verdict("j2", f"c{i}", category_to_score[b]))
+
+        result = CohenKappa().compute(v, ScaleType.NOMINAL)
+        assert result.kappa == pytest.approx(0.5455, abs=0.0001)
+        assert result.expected_chance_agreement == pytest.approx(0.34, abs=0.0001)
