@@ -9,6 +9,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.3.1] — 2026-10-12
+
+> **Heads-up:** Anthropic judges now actually run at the configured temperature (0.0 was previously
+> dropped, so the API default applied). Scores for Anthropic judges can differ from 0.3.0; see *Changed*.
+
 ### Added
 
 - **Explicit, inspectable request parameters.** `max_tokens`, `max_tokens_param`,
@@ -40,6 +47,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Guard tests (`tests/test_naming.py`): no stale package name in shipped text, every
   `from judge_kappa import ...` in `examples/` resolves, and CLI usage names the installed
   command.
+- CI: AI review of pull requests through a shared PR Agent workflow, pinned by commit SHA with minimal
+  permissions. The review is posted as comments and leaves the PR body (and its sign-off) untouched.
 
 ### Changed
 
@@ -289,7 +298,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 8 test modules, 60+ tests, zero real LLM calls (MockLLMBackend)
 - Coverage: models, adapters, judges (scoring math, ICL, malformed JSON), panels, agreement metrics, bias detectors, evaluator integration, CLI schema validation, key resolution
 
-[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.1.0...v0.2.0
