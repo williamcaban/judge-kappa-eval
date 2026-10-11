@@ -38,10 +38,25 @@ class VerbosityBiasDetector(BiasDetector):
         threshold: float = 0.30,
         tiktoken_encoding: str = "cl100k_base",
     ) -> None:
+        """Configure the threshold; see the class docstring for each argument."""
         self._threshold = threshold
         self._encoding = tiktoken_encoding
 
     def detect(self, **kwargs: Any) -> BiasResult:
+        """Correlate score with output length across the verdicts.
+
+        Args:
+            verdicts: (keyword) the ``JudgeVerdict`` list.
+
+        Returns:
+            ``BiasResult`` with Spearman rho, its p-value and ``verbosity_biased`` (|rho| above
+            the threshold and p < 0.05). Length is ``output_token_count`` when set, otherwise the
+            word count of the rationale as an approximation. Fewer than 3 verdicts return an
+            empty result.
+
+        Note:
+            ``tiktoken_encoding`` is accepted but not currently used for counting.
+        """
         verdicts: list[JudgeVerdict] = kwargs["verdicts"]
 
         scores = [v.score for v in verdicts]

@@ -33,6 +33,10 @@ from judge_kappa.ranking.btl import ComparisonGame, bootstrap_btl, fit_btl
 
 @dataclass
 class PositionalBiasReport:
+    """Outcome of the swap test for one case: control and treatment judged in both display orders.
+
+    ``control_scores`` and ``treatment_scores`` are ``(round 1, round 2)``.
+    """
     case_id: str
     positional_flip: bool
     score_instability: float
@@ -44,7 +48,7 @@ class PositionalBiasReport:
 
 @dataclass
 class OrderEffectEstimate:
-    """Display-order effect of one judge (see :meth:`PositionalBiasDetector.estimate_order_effect`)."""
+    """Display-order effect of one judge, from ``PositionalBiasDetector.estimate_order_effect``."""
 
     order_effect: float
     ci_low: float | None
@@ -53,6 +57,7 @@ class OrderEffectEstimate:
 
 
 def _outcome(first: float, second: float) -> float:
+    """1.0 if the first score wins, 0.0 if the second wins, 0.5 on a tie."""
     if first > second:
         return 1.0
     if first < second:
@@ -61,7 +66,17 @@ def _outcome(first: float, second: float) -> float:
 
 
 class PositionalBiasDetector(BiasDetector):
+    """Swap test for positional bias.
+
+    Each case is judged twice with control and treatment outputs in swapped positions. A judge that
+    prefers the first-shown output in both rounds is positionally biased.
+    """
     def __init__(self, judge: PairwiseJudge) -> None:
+        """Create a detector around a pairwise judge.
+
+        Args:
+            judge: The ``PairwiseJudge`` used for both rounds.
+        """
         self._judge = judge
 
     @staticmethod
@@ -104,6 +119,15 @@ class PositionalBiasDetector(BiasDetector):
         treatment_output: str,
     ) -> PositionalBiasReport:
         # Round 1: control=A, treatment=B
+        """Run both rounds for one case.
+
+        Round 1 shows control first, round 2 shows treatment first.
+
+        Returns:
+            A ``PositionalBiasReport``. ``positional_flip`` is True when the first-shown output wins
+            both rounds; ``score_instability`` is the mean absolute score change per variant
+            between rounds.
+        """
         va_r1, vb_r1 = self._judge.judge_pair(
             case, control_output, treatment_output, "control", "treatment"
         )
@@ -131,6 +155,15 @@ class PositionalBiasDetector(BiasDetector):
         )
 
     def detect(self, **kwargs: Any) -> BiasResult:
+        """Aggregate per-case reports into a corpus-level ``BiasResult``.
+
+        Args:
+            reports: (keyword) the ``PositionalBiasReport`` list.
+
+        Returns:
+            ``positional_bias_rate`` (fraction of flipped cases) and the order-aware
+            ``order_effect`` with its bootstrap interval (see ``estimate_order_effect``).
+        """
         reports: list[PositionalBiasReport] = kwargs["reports"]
         rate = (
             sum(1 for r in reports if r.positional_flip) / len(reports)

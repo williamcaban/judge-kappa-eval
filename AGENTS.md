@@ -240,7 +240,7 @@ Open a PR to `main`. Branch protection requires all CI jobs to pass before merge
 Run the following locally from the repo root. All must be clean:
 
 ```bash
-uv run ruff check src tests     # zero errors — "All checks passed!"
+uv run ruff check src tests     # zero errors — "All checks passed!" (includes the missing-docstring rules D1)
 uv run mypy src                 # zero errors — "Success: no issues found"
 uv run pytest                   # zero failures
 uv run judge-kappa validate examples/config_*.yaml   # all configs valid

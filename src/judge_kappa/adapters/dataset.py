@@ -13,7 +13,22 @@ from judge_kappa.models import EvalCase
 
 
 class DatasetAdapter(InputAdapter):
+    """Adapter for MLflow-LLMaJ-style datasets: a list of
+    ``{"id", "inputs", "expectations"}`` rows.
+    """
     def load(self, source: object) -> list[EvalCase]:
+        """Convert dataset rows into ``EvalCase`` objects.
+
+        The prompt comes from ``inputs["question"]``, then ``inputs["prompt"]``, otherwise the
+        JSON-serialised inputs. ``expectations["answer"]`` (or ``expected_answer``)
+        becomes ``expected_output``. Rows without an ``id`` get ``case-NNNN``.
+
+        Args:
+            source: A list of row dicts.
+
+        Returns:
+            One ``EvalCase`` per row; the raw inputs and expectations are kept in ``metadata``.
+        """
         data: list[dict[str, Any]] = source  # type: ignore[assignment]
         cases: list[EvalCase] = []
         for i, row in enumerate(data):

@@ -27,6 +27,7 @@ from judge_kappa.models import AgreementResult, JudgeVerdict
 
 
 def _interpret_icc(icc: float) -> str:
+    """Map an ICC(2,k) value to its Cicchetti (1994) reliability band."""
     if icc >= 0.75:
         return "excellent reliability (ICC ≥ 0.75)"
     elif icc >= 0.60:

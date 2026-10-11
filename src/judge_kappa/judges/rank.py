@@ -56,10 +56,17 @@ class RankJudge(LLMJudge):
     """
 
     def __init__(self, *args: Any, max_systems: int = 12, **kwargs: Any) -> None:
+        """Create a ranking judge.
+
+        Args:
+            max_systems: Upper bound on systems per call (default 12); the other arguments are
+                those of ``LLMJudge``.
+        """
         super().__init__(*args, **kwargs)
         self._max_systems = max_systems
 
     def judge(self, case: EvalCase, output: str, variant_name: str) -> JudgeVerdict:
+        """Not supported: raises ``NotImplementedError``; use ``rank()``."""
         raise NotImplementedError(
             "RankJudge.rank() takes a dict of {system_name: output}. "
             "Use AssertionJudge or RubricJudge for single-output scoring."

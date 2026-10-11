@@ -138,6 +138,15 @@ def _run_variant(variant: Variant, case: EvalCase, default_backend: LLMBackend) 
 
 
 class JuryEvaluator:
+    """Orchestrates an A/B evaluation of two variants with a panel of judges.
+
+    Generates (or reads) an output per case and variant, judges it, and returns an ``EvalReport``
+    with uplift, agreement (alpha, kappa, ICC), significance, judge fit, bias diagnostics,
+    data quality and run provenance.
+
+    Entry points: ``evaluate_skill``, ``evaluate_dataset``, ``evaluate_endpoints``,
+    ``evaluate_prerecorded``, ``evaluate_pairwise_dataset`` and the low-level ``evaluate``.
+    """
     def __init__(
         self,
         panel: EvaluationPanel,
@@ -186,6 +195,16 @@ class JuryEvaluator:
         control_variant: Variant | None = None,
         treatment_variant: Variant | None = None,
     ) -> EvalReport:
+        """Evaluate a skill directory.
+
+        Control runs without the skill; treatment gets ``SKILL.md`` injected as ``skill_context``
+        (unless a variant is supplied).
+
+        Args:
+            skill_dir: Directory holding ``SKILL.md`` and ``evals/evals.json``.
+            control_variant: Optional control variant.
+            treatment_variant: Optional treatment variant.
+        """
         adapter = SkillAdapter()
         cases, skill_md = adapter.load_with_context(skill_dir)
         ctrl = control_variant or Variant(name="control")
@@ -426,6 +445,14 @@ class JuryEvaluator:
         control: Variant,
         treatment: Variant,
     ) -> EvalReport:
+        """Evaluate control against treatment on a list of cases.
+
+        Cases run concurrently when ``max_workers`` is above 1; results are assembled in case order,
+        so the report does not depend on scheduling.
+
+        Returns:
+            An ``EvalReport`` including ``data_quality`` and ``run`` provenance.
+        """
         all_verdicts: list[JudgeVerdict] = []
         pos_reports:  list[PositionalBiasReport] = []
         case_results: list[CaseResult] = []

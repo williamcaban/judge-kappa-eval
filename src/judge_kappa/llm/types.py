@@ -78,6 +78,11 @@ class UsageStats:
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def record(self, resp: LLMResponse) -> None:
+        """Add one reply to the totals.
+
+        A cache hit counts as a call and a hit, not as tokens or latency, so totals reflect what was
+        billed; its truncation flag is still counted.
+        """
         with self._lock:
             self._calls += 1
             if resp.cached:
@@ -97,10 +102,12 @@ class UsageStats:
             self._latency_s += resp.latency_s or 0.0
 
     def record_error(self) -> None:
+        """Count one failed call."""
         with self._lock:
             self._errors += 1
 
     def snapshot(self) -> UsageSnapshot:
+        """Immutable copy of the current totals."""
         with self._lock:
             return UsageSnapshot(
                 calls=self._calls,

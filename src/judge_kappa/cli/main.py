@@ -25,6 +25,10 @@ from judge_kappa.models import DataQuality, EvalReport, RunMetadata
 
 
 def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig | PairwiseModeConfig:
+    """Parse a YAML file into the config model for its ``mode``.
+
+    Exits with an error message for an unknown mode.
+    """
     raw = yaml.safe_load(Path(path).read_text())
     mode = raw.get("mode")
     if mode == "skill":
@@ -39,6 +43,7 @@ def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig | PairwiseMod
 
 
 def _render_text(report: EvalReport) -> str:
+    """Render the human-readable text report, including data-quality warnings and a usage line."""
     lines = [
         "=== JuryEval Report ===",
         f"Cases:              {len(report.cases)}",
@@ -94,6 +99,7 @@ def _render_quality(dq: DataQuality, run: RunMetadata | None) -> list[str]:
 
 
 def _write_output(content: str, file: str | None) -> None:
+    """Write ``content`` to ``file`` (noted on stderr), or to stdout when None."""
     if file:
         Path(file).write_text(content)
         print(f"Report written to {file}", file=sys.stderr)
@@ -102,6 +108,7 @@ def _write_output(content: str, file: str | None) -> None:
 
 
 def _die(msg: str) -> None:
+    """Print an error to stderr and exit with status 1."""
     print(f"Error: {msg}", file=sys.stderr)
     sys.exit(1)
 
@@ -110,6 +117,14 @@ def _die(msg: str) -> None:
 
 
 def cmd_run(config_path: str, output_file: str | None, fmt: str, include_verdicts: bool) -> None:
+    """Run an evaluation from a YAML config and emit the report.
+
+    Args:
+        config_path: Path to the YAML config.
+        output_file: Overrides the config's output file when set.
+        fmt: ``text``, ``json`` or ``jsonl``.
+        include_verdicts: Keep per-judge verdicts in the JSON report.
+    """
     config = _load_config(config_path)
 
     if isinstance(config, PairwiseModeConfig):
@@ -200,6 +215,7 @@ def cmd_run(config_path: str, output_file: str | None, fmt: str, include_verdict
 
 
 def cmd_validate(config_path: str) -> None:
+    """Validate a config file; print a confirmation, or exit non-zero with the error."""
     try:
         _load_config(config_path)
         print(f"✓ Config valid: {config_path}")

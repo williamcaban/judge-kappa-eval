@@ -29,6 +29,7 @@ _TRACKED_PACKAGES = ("openai", "anthropic", "numpy", "scipy", "pydantic", "sciki
 
 
 def _version(dist: str) -> str | None:
+    """Installed version of a distribution, or None when it is not installed."""
     try:
         return metadata.version(dist)
     except metadata.PackageNotFoundError:
@@ -36,15 +37,18 @@ def _version(dist: str) -> str | None:
 
 
 def _as_float(value: object, default: float = 0.0) -> float:
+    """``value`` as a float, or ``default`` when it is not a real number."""
     return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else default
 
 
 def _as_int(value: object, default: int = 0) -> int:
+    """``value`` as an int, or ``default`` when it is not an integer."""
     return int(value) if isinstance(value, int) and not isinstance(value, bool) else default
 
 
 @dataclass
 class _Track:
+    """A backend being tracked: its role, the judges using it, and usage before the run."""
     backend: object
     role: str
     judge_ids: list[str] = field(default_factory=list)
@@ -53,6 +57,7 @@ class _Track:
 
 @dataclass
 class RunState:
+    """Handle returned by ``begin_run`` and passed to ``end_run``."""
     started_at: datetime
     t0: float
     tracks: list[_Track]

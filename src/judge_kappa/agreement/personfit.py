@@ -50,9 +50,24 @@ class PersonFitAnalyzer:
     """
 
     def __init__(self, alpha_threshold: float = 1.96) -> None:
+        """Configure the flagging threshold.
+
+        Args:
+            alpha_threshold: |t| above which a judge is flagged as inconsistent (default 1.96).
+        """
         self._threshold = alpha_threshold
 
     def analyze(self, verdicts: list[JudgeVerdict]) -> list[JudgeFitResult]:
+        """Compute a person-fit statistic for every judge.
+
+        Args:
+            verdicts: One verdict per (judge, case).
+
+        Returns:
+            One ``JudgeFitResult`` per judge, ordered by judge id. ``lz_statistic`` is the
+            standardised outfit t (clipped to +/-10), NaN for a judge with fewer than 3 usable
+            items; a judge is flagged when |t| exceeds the threshold.
+        """
         judge_ids = sorted({v.judge_id for v in verdicts})
         case_ids  = sorted({v.eval_case_id for v in verdicts})
 

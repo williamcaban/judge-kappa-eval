@@ -1,3 +1,7 @@
+"""Inter-rater agreement metrics: Krippendorff's alpha, Cohen's kappa, ICC(2,k),
+person-fit and behavioural alignment.
+"""
+
 from judge_kappa.agreement.alpha import KrippendorffAlpha
 from judge_kappa.agreement.base import AgreementMetric
 from judge_kappa.agreement.behavioral import BehavioralAlignmentMetric

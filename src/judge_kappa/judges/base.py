@@ -32,6 +32,7 @@ class JudgeParseError(ValueError):
     """A judge reply could not be used and ``on_parse_failure="raise"`` was set."""
 
     def __init__(self, judge_id: str, case_id: str, error: str, excerpt: str) -> None:
+        """Build the message and keep the judge id, case id and error code on the exception."""
         super().__init__(
             f"judge '{judge_id}' returned an unusable reply for case '{case_id}' "
             f"({error}): {excerpt!r}"
@@ -51,6 +52,7 @@ class ParsedReply:
 
     @property
     def failed(self) -> bool:
+        """True when the reply was not usable."""
         return self.error is not None
 
 
@@ -94,6 +96,12 @@ def numeric_scores(raw: object) -> dict[str, float]:
 
 
 class LLMJudge(ABC):
+    """Abstract base for judges that score an output by calling an ``LLMBackend``.
+
+    Provides calibration-anchor (ICL) rendering, reply parsing and validation with an
+    ``on_parse_failure`` policy, and the accessors run provenance needs. Subclasses implement
+    ``judge()``.
+    """
     def __init__(
         self,
         judge_id: str,
@@ -121,18 +129,22 @@ class LLMJudge(ABC):
 
     @property
     def backend(self) -> LLMBackend:
+        """The backend this judge calls."""
         return self._backend
 
     @property
     def temperature(self) -> float:
+        """The sampling temperature sent with every request."""
         return self._temperature
 
     @property
     def on_parse_failure(self) -> str:
+        """Policy for unusable replies: ``flag`` or ``raise``."""
         return self._on_parse_failure
 
     @property
     def n_calibration_examples(self) -> int:
+        """Number of ICL calibration examples in the prompt."""
         return len(self._calibration)
 
     def _icl_block(self) -> str:
@@ -151,6 +163,7 @@ class LLMJudge(ABC):
         return "\n".join(lines)
 
     def _call(self, system: str, user: str) -> str:
+        """Call the backend and return only the reply text."""
         return self._call_full(system, user).text
 
     def _call_full(self, system: str, user: str) -> LLMResponse:
@@ -159,6 +172,10 @@ class LLMJudge(ABC):
 
     @staticmethod
     def _parse_json(text: str) -> dict[str, Any]:
+        """Extract the outermost JSON object from ``text``.
+
+        Returns ``{"_raw": text}`` when no valid JSON object can be parsed.
+        """
         match = re.search(r"\{.*\}", text, re.DOTALL)
         raw = match.group(0) if match else text
         try:
