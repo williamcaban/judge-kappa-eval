@@ -127,7 +127,7 @@ class TestCLIValidateCommand:
         config_path = tmp_path / "config.yaml"
         config_path.write_text(yaml.dump(MINIMAL_SKILL_CONFIG))
         captured = StringIO()
-        with patch("sys.argv", ["jury-eval", "validate", str(config_path)]), \
+        with patch("sys.argv", ["judge-kappa", "validate", str(config_path)]), \
                 patch("sys.stdout", captured):
             from judge_kappa.cli.main import app
             app()
@@ -137,7 +137,7 @@ class TestCLIValidateCommand:
         bad_config = {"mode": "skill"}  # missing required fields
         config_path = tmp_path / "bad.yaml"
         config_path.write_text(yaml.dump(bad_config))
-        with patch("sys.argv", ["jury-eval", "validate", str(config_path)]), \
+        with patch("sys.argv", ["judge-kappa", "validate", str(config_path)]), \
                 pytest.raises(SystemExit) as exc:
             from judge_kappa.cli.main import app
             app()
@@ -146,7 +146,7 @@ class TestCLIValidateCommand:
 
 class TestCLISchemaCommand:
     def test_schema_outputs_valid_json(self, capsys):
-        with patch("sys.argv", ["jury-eval", "schema"]):
+        with patch("sys.argv", ["judge-kappa", "schema"]):
             from judge_kappa.cli.main import app
             app()
         captured = capsys.readouterr()
@@ -155,7 +155,7 @@ class TestCLISchemaCommand:
         assert "dataset_mode" in parsed
 
     def test_skill_schema_has_required_fields(self, capsys):
-        with patch("sys.argv", ["jury-eval", "schema"]):
+        with patch("sys.argv", ["judge-kappa", "schema"]):
             from judge_kappa.cli.main import app
             app()
         schema = json.loads(capsys.readouterr().out)
@@ -167,21 +167,21 @@ class TestCLISchemaCommand:
 
 class TestCLIHelpAndErrors:
     def test_no_args_shows_help(self, capsys):
-        with patch("sys.argv", ["jury-eval"]):
+        with patch("sys.argv", ["judge-kappa"]):
             from judge_kappa.cli.main import app
             app()
         out = capsys.readouterr().out
         assert "Usage" in out
 
     def test_unknown_command_exits(self):
-        with patch("sys.argv", ["jury-eval", "unknown-cmd"]), \
+        with patch("sys.argv", ["judge-kappa", "unknown-cmd"]), \
                 pytest.raises(SystemExit) as exc:
             from judge_kappa.cli.main import app
             app()
         assert exc.value.code != 0
 
     def test_run_missing_config_arg_exits(self):
-        with patch("sys.argv", ["jury-eval", "run"]), pytest.raises(SystemExit) as exc:
+        with patch("sys.argv", ["judge-kappa", "run"]), pytest.raises(SystemExit) as exc:
             from judge_kappa.cli.main import app
             app()
         assert exc.value.code != 0
@@ -189,7 +189,7 @@ class TestCLIHelpAndErrors:
     def test_invalid_format_exits(self, tmp_path):
         config_path = tmp_path / "config.yaml"
         config_path.write_text(yaml.dump(MINIMAL_SKILL_CONFIG))
-        with patch("sys.argv", ["jury-eval", "run", str(config_path), "--format", "xml"]), \
+        with patch("sys.argv", ["judge-kappa", "run", str(config_path), "--format", "xml"]), \
                 pytest.raises(SystemExit) as exc:
             from judge_kappa.cli.main import app
             app()

@@ -16,7 +16,7 @@ class OpenAIBackend:
         try:
             from openai import OpenAI
         except ImportError as exc:
-            raise ImportError("Install the openai extra: pip install 'jury-eval[openai]'") from exc
+            raise ImportError("Install the openai extra: pip install 'judge-kappa[openai]'") from exc
 
         self._model = model
         self._client = OpenAI(api_key=api_key, base_url=base_url)

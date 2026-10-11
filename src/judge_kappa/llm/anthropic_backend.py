@@ -11,7 +11,7 @@ class AnthropicBackend:
         try:
             import anthropic
         except ImportError as exc:
-            raise ImportError("Install the anthropic extra: pip install 'jury-eval[anthropic]'") from exc
+            raise ImportError("Install the anthropic extra: pip install 'judge-kappa[anthropic]'") from exc
 
         self._model = model
         self._client = anthropic.Anthropic(api_key=api_key)
