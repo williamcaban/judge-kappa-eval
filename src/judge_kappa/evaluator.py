@@ -45,7 +45,7 @@ from judge_kappa.agreement.personfit import PersonFitAnalyzer
 from judge_kappa.bias.positional import PositionalBiasDetector, PositionalBiasReport
 from judge_kappa.bias.verbosity import VerbosityBiasDetector
 from judge_kappa.judges.pairwise import PairwiseJudge
-from judge_kappa.llm.base import LLMBackend
+from judge_kappa.llm.base import LLMBackend, call_backend
 from judge_kappa.models import (
     AgreementResult,
     BiasResult,
@@ -131,7 +131,7 @@ def _run_variant(variant: Variant, case: EvalCase, default_backend: LLMBackend) 
     if variant.skill_context:
         parts.append(f"## Skill Instructions\n{variant.skill_context}")
     system = "\n\n".join(parts) or "You are a helpful assistant."
-    return backend.complete(system=system, user=case.prompt, temperature=variant.temperature)
+    return call_backend(backend, system, case.prompt, variant.temperature).text
 
 
 class JuryEvaluator:

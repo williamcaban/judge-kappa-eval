@@ -194,3 +194,64 @@ class TestCLIHelpAndErrors:
             from judge_kappa.cli.main import app
             app()
         assert exc.value.code != 0
+
+
+# ── Backend request parameters (config → builder → backend) ───────────────────
+
+
+class TestBackendRequestParameters:
+    def test_defaults_are_unset(self):
+        from judge_kappa.cli.config_schema import BackendConfig
+
+        cfg = BackendConfig(provider="openai", model="m")
+        assert cfg.max_tokens is None and cfg.omit_temperature is False
+        assert cfg.timeout_s is None and cfg.max_retries is None
+        assert cfg.max_tokens_param == "max_tokens"
+
+    @pytest.mark.parametrize(
+        "bad", [{"max_tokens": 0}, {"timeout_s": 0}, {"max_retries": -1}, {"max_tokens_param": "n"}]
+    )
+    def test_invalid_values_rejected(self, bad):
+        from pydantic import ValidationError
+
+        from judge_kappa.cli.config_schema import BackendConfig
+
+        with pytest.raises(ValidationError):
+            BackendConfig(provider="openai", model="m", **bad)
+
+    def test_builder_forwards_options_to_openai_backend(self, monkeypatch):
+        from judge_kappa.cli import builder
+        from judge_kappa.cli.config_schema import BackendConfig
+
+        seen: dict = {}
+
+        class _Fake:
+            def __init__(self, **kw):
+                seen.update(kw)
+
+        monkeypatch.setattr(builder, "OpenAIBackend", _Fake)
+        builder._build_backend(BackendConfig(
+            provider="openai", model="m", api_key_env="", base_url="http://x/v1",
+            max_tokens=256, max_tokens_param="max_completion_tokens",
+            omit_temperature=True, timeout_s=9.0, max_retries=1,
+        ))
+        assert seen["max_tokens"] == 256 and seen["max_tokens_param"] == "max_completion_tokens"
+        assert seen["omit_temperature"] is True
+        assert seen["timeout_s"] == 9.0 and seen["max_retries"] == 1
+
+    def test_builder_anthropic_uses_backend_default_when_unset(self, monkeypatch):
+        from judge_kappa.cli import builder
+        from judge_kappa.cli.config_schema import BackendConfig
+
+        seen: dict = {}
+
+        class _Fake:
+            def __init__(self, **kw):
+                seen.update(kw)
+
+        monkeypatch.setattr(builder, "AnthropicBackend", _Fake)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+        builder._build_backend(BackendConfig(provider="anthropic", model="claude-x"))
+        assert "max_tokens" not in seen            # backend default (2048) applies
+        builder._build_backend(BackendConfig(provider="anthropic", model="claude-x", max_tokens=900))
+        assert seen["max_tokens"] == 900

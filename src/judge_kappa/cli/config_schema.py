@@ -58,6 +58,21 @@ class BackendConfig(BaseModel):
     # ""   → no auth; passes placeholder "no-key" (Ollama, vLLM without token)
     # "MY_VAR" → reads key from environment variable MY_VAR at runtime
 
+    # ── Request parameters (explicit so runs are reproducible and inspectable) ──
+    max_tokens: int | None = Field(default=None, gt=0)
+    # Output-token cap. None → provider default for OpenAI-compatible servers,
+    # 2048 for Anthropic (the API requires a value). Truncated replies are reported.
+    max_tokens_param: Literal["max_tokens", "max_completion_tokens"] = "max_tokens"
+    # Wire name of the cap for OpenAI-compatible servers; OpenAI reasoning models
+    # require "max_completion_tokens".
+    omit_temperature: bool = False
+    # True → never send `temperature` (for models that reject it). Default sends it,
+    # including 0.0.
+    timeout_s: float | None = Field(default=None, gt=0)
+    # Per-request timeout forwarded to the provider SDK. None → SDK default.
+    max_retries: int | None = Field(default=None, ge=0)
+    # SDK-level retries for transient errors (429, 5xx, connection). None → SDK default.
+
 
 class CalibrationConfig(BaseModel):
     prompt: str

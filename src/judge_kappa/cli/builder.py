@@ -75,8 +75,24 @@ def _resolve_api_key(api_key_env: str | None, provider: str) -> str | None:
 def _build_backend(cfg: BackendConfig) -> LLMBackend:
     api_key = _resolve_api_key(cfg.api_key_env, cfg.provider)
     if cfg.provider == "anthropic":
-        return AnthropicBackend(model=cfg.model, api_key=api_key)
-    return OpenAIBackend(model=cfg.model, base_url=cfg.base_url, api_key=api_key)
+        anthropic_kwargs: dict[str, object] = {
+            "omit_temperature": cfg.omit_temperature,
+            "timeout_s": cfg.timeout_s,
+            "max_retries": cfg.max_retries,
+        }
+        if cfg.max_tokens is not None:
+            anthropic_kwargs["max_tokens"] = cfg.max_tokens   # else the backend default applies
+        return AnthropicBackend(model=cfg.model, api_key=api_key, **anthropic_kwargs)  # type: ignore[arg-type]
+    return OpenAIBackend(
+        model=cfg.model,
+        base_url=cfg.base_url,
+        api_key=api_key,
+        max_tokens=cfg.max_tokens,
+        max_tokens_param=cfg.max_tokens_param,
+        omit_temperature=cfg.omit_temperature,
+        timeout_s=cfg.timeout_s,
+        max_retries=cfg.max_retries,
+    )
 
 
 def _build_calibration(items: list[CalibrationConfig]) -> list[CalibrationExample]:

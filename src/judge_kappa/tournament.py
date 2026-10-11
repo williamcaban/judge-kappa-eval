@@ -44,7 +44,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from judge_kappa.judges.pairwise import PairwiseJudge
-from judge_kappa.llm.base import LLMBackend
+from judge_kappa.llm.base import LLMBackend, call_backend
 from judge_kappa.models import EvalCase, Variant
 from judge_kappa.ranking.btl import ELO_SCALE, ComparisonGame, bootstrap_btl, fit_btl
 
@@ -287,8 +287,10 @@ class TournamentEvaluator:
                         parts.append(f"## Skill Instructions\n{variant.skill_context}")
                     system_msg = "\n\n".join(parts) or "You are a helpful assistant."
                     outputs[variant.name].append(
-                        backend.complete(system=system_msg, user=case.prompt,  # type: ignore[union-attr]
-                                         temperature=variant.temperature)
+                        call_backend(
+                            backend,  # type: ignore[arg-type]
+                            system_msg, case.prompt, variant.temperature,
+                        ).text
                     )
 
         return self._run_tournament(cases, system_names, outputs)

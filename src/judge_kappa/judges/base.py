@@ -14,7 +14,8 @@ import re
 from abc import ABC, abstractmethod
 from typing import Any
 
-from judge_kappa.llm.base import LLMBackend
+from judge_kappa.llm.base import LLMBackend, call_backend
+from judge_kappa.llm.types import LLMResponse
 from judge_kappa.models import CalibrationExample, EvalCase, JudgeVerdict
 
 
@@ -47,7 +48,11 @@ class LLMJudge(ABC):
         return "\n".join(lines)
 
     def _call(self, system: str, user: str) -> str:
-        return self._backend.complete(system, user, self._temperature)
+        return self._call_full(system, user).text
+
+    def _call_full(self, system: str, user: str) -> LLMResponse:
+        """Call the backend and keep usage, finish reason and latency."""
+        return call_backend(self._backend, system, user, self._temperature)
 
     @staticmethod
     def _parse_json(text: str) -> dict[str, Any]:
