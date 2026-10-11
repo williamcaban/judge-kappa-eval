@@ -16,7 +16,7 @@ import re
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, TypeGuard
 
 from judge_kappa.llm.base import LLMBackend, call_backend
 from judge_kappa.llm.types import LLMResponse
@@ -54,6 +54,17 @@ class ParsedReply:
         return self.error is not None
 
 
+def is_finite_number(value: object) -> TypeGuard[int | float]:
+    """A real, finite int/float (not bool). ``json.loads`` accepts ``Infinity``/``NaN`` and
+    arbitrarily large ints, any of which would otherwise raise in float arithmetic."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
 def validate_score_map(
     raw: object, expected: Sequence[str], kind: str, *, low: float = 0.0, high: float = 1.0
 ) -> str | None:
@@ -68,7 +79,7 @@ def validate_score_map(
     if missing:
         return f"missing_{kind}s:{len(missing)}/{len(expected)}"
     values = [raw[k] for k in expected]
-    if any(isinstance(v, bool) or not isinstance(v, int | float) or math.isnan(v) for v in values):
+    if not all(is_finite_number(v) for v in values):
         return f"non_numeric_{kind}_score"
     if any(v < low or v > high for v in values):
         return f"out_of_range_{kind}_score"
@@ -79,11 +90,7 @@ def numeric_scores(raw: object) -> dict[str, float]:
     """Numeric entries of a score object (anything else is dropped)."""
     if not isinstance(raw, dict):
         return {}
-    return {
-        str(k): float(v)
-        for k, v in raw.items()
-        if isinstance(v, int | float) and not isinstance(v, bool) and not math.isnan(v)
-    }
+    return {str(k): float(v) for k, v in raw.items() if is_finite_number(v)}
 
 
 class LLMJudge(ABC):

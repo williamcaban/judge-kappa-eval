@@ -142,9 +142,14 @@ JuryEvaluator(panel=panel, generation_backend=backend, max_workers=8)
 or `max_workers: 8` at the top level of a YAML config. Judge calls are I/O-bound, so a thread
 pool is enough. The default is `1`, which runs inline with no threads.
 
-**Contract: results do not depend on `max_workers`.** Work is assembled in input order, so
-reports are identical for any worker count. The test suite compares sequential and concurrent
-reports and uses a barrier that only releases when two calls genuinely overlap.
+**Contract: results do not depend on `max_workers`.** For the same judge replies, work is
+assembled in input order, so scores, counts, ratings, verdict order and `data_quality` are
+identical for any worker count. Only run metadata differs by nature (`run.settings.max_workers`,
+timestamps, durations). The test suite compares sequential and concurrent reports with `run`
+excluded, and uses a barrier that only releases when two calls genuinely overlap.
+
+A failure surfaces as soon as it happens, even if earlier items are still running; queued work
+is cancelled. Calls already in flight finish in the background.
 
 Requirements when `max_workers > 1`: `Variant.predict_fn` callables and custom backends must
 be thread-safe. The built-in backends are. Provider rate limits still apply; the SDK retries

@@ -10,12 +10,11 @@ is inherently dual — it scores both A and B in one prompt.
 
 from __future__ import annotations
 
-import math
 import textwrap
 from dataclasses import dataclass
 from typing import Any
 
-from judge_kappa.judges.base import LLMJudge
+from judge_kappa.judges.base import LLMJudge, is_finite_number
 from judge_kappa.models import EvalCase, JudgeVerdict
 
 _SYSTEM = textwrap.dedent("""\
@@ -38,15 +37,13 @@ _SYSTEM = textwrap.dedent("""\
 
 def _as_score(value: object, default: float) -> float:
     """A usable numeric score, or ``default`` when the reply gave something else."""
-    if isinstance(value, bool) or not isinstance(value, int | float) or math.isnan(value):
-        return default
-    return float(value)
+    return float(value) if is_finite_number(value) else default
 
 
 def _validate_pair(data: dict[str, Any]) -> str | None:
     for key in ("score_a", "score_b"):
         v = data[key]
-        if isinstance(v, bool) or not isinstance(v, int | float) or math.isnan(v):
+        if not is_finite_number(v):
             return "non_numeric_score"
         if v < 0.0 or v > 1.0:
             return "out_of_range_score"

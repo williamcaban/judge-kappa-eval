@@ -347,6 +347,7 @@ class JuryEvaluator:
                 rationale=va.rationale,
                 parse_failed=va.parse_failed,
                 parse_error=va.parse_error,
+                truncated=va.truncated,
             )
 
         results = ordered_map(_judge_row, list(enumerate(data)), self._max_workers)
@@ -367,7 +368,7 @@ class JuryEvaluator:
             label_b=label_b,
             judge_id=pairwise_judge.judge_id,
             data_quality=compute_data_quality(
-                (pairwise_judge.judge_id, r.parse_error, False) for r in results
+                (pairwise_judge.judge_id, r.parse_error, r.truncated) for r in results
             ),
             run=end_run(run_state, settings={
                 "mode": "pairwise_dataset", "n_cases": n,
@@ -501,7 +502,7 @@ class JuryEvaluator:
         replies: list[ReplyFlag] = [(v.judge_id, v.parse_error, v.truncated) for v in all_verdicts]
         if self._positional_judge is not None:
             replies += [
-                (self._positional_judge.judge_id, r.parse_error, False) for r in pos_reports
+                (self._positional_judge.judge_id, r.parse_error, r.truncated) for r in pos_reports
             ]
         data_quality = compute_data_quality(
             replies, extra_truncated=generation_truncations(run_state)

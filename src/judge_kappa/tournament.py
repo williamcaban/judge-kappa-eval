@@ -474,6 +474,7 @@ class TournamentEvaluator:
         for i, a in enumerate(system_names):
             for b in system_names[i + 1:]:
                 total = wins[a][b] + wins[b][a] + ties[a][b]
+                usable = total > 0
                 if total == 0:
                     total = 1
                 rate_a = (wins[a][b] + 0.5 * ties[a][b]) / total
@@ -492,8 +493,10 @@ class TournamentEvaluator:
                     preference_rate_a=round(rate_a, 4),
                     preference_rate_b=round(rate_b, 4),
                     tie_rate=round(ties[a][b] / total, 4),
-                    mean_score_a=round(score_sums[a][b] / n_cases, 4),
-                    mean_score_b=round(score_sums[b][a] / n_cases, 4),
+                    # Mean over the cases that produced a usable round for this pair
+                    # (all cases unless exclude_parse_failures dropped some).
+                    mean_score_a=round(score_sums[a][b] / total, 4) if usable else 0.0,
+                    mean_score_b=round(score_sums[b][a] / total, 4) if usable else 0.0,
                     positional_bias_rate=round(pos_rate, 4),
                 ))
 
@@ -513,7 +516,10 @@ class TournamentEvaluator:
                 + (f"; no usable game for: {', '.join(unrated)}." if unrated else ".")
             ) from exc
         boot = None
-        if self._n_bootstrap >= 2 and n_cases >= 2:
+        # Resample over the cases that actually produced a game, not the input case count:
+        # exclusion can leave fewer than two.
+        usable_cases = len({g.case for g in games})
+        if self._n_bootstrap >= 2 and usable_cases >= 2:
             boot = bootstrap_btl(
                 len(system_names), games,
                 n_boot=self._n_bootstrap, ci_level=self._ci_level, seed=self._bootstrap_seed,
@@ -542,6 +548,15 @@ class TournamentEvaluator:
 
         standings.sort(key=lambda s: s.elo, reverse=True)
 
+        quality = compute_data_quality(
+            replies, extra_truncated=generation_truncations(run_state)
+        )
+        if self._n_bootstrap >= 2 and boot is None:
+            quality.warnings.append(
+                f"Confidence intervals omitted: only {usable_cases} case(s) produced a usable "
+                "game, and the bootstrap needs at least 2."
+            )
+
         return TournamentReport(
             standings=standings,
             pair_results=pair_results,
@@ -558,9 +573,7 @@ class TournamentEvaluator:
             order_identifiable=swap_based and btl.order_identifiable,
             possibly_separated=btl.possibly_separated,
             ci_level=self._ci_level if boot else None,
-            data_quality=compute_data_quality(
-                replies, extra_truncated=generation_truncations(run_state)
-            ),
+            data_quality=quality,
             run=end_run(run_state, settings={
                 "mode": "tournament",
                 "n_systems": len(system_names),

@@ -25,6 +25,7 @@ import hashlib
 import json
 import os
 import threading
+from concurrent.futures import Future
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -64,6 +65,7 @@ class CachedBackend:
         self._path = Path(path)
         self._namespace = namespace
         self._entries: dict[str, LLMResponse] = {}
+        self._inflight: dict[str, Future[LLMResponse]] = {}
         self._lock = threading.Lock()
         self.stats = UsageStats()
         self.skipped_lines = 0
@@ -98,19 +100,41 @@ class CachedBackend:
         self, system: str, user: str, temperature: float = 0.0
     ) -> LLMResponse:
         key = self._key(system, user, temperature)
+        waiting_on: Future[LLMResponse] | None = None
+        leader_future: Future[LLMResponse] | None = None
         with self._lock:
             hit = self._entries.get(key)
+            if hit is None:
+                waiting_on = self._inflight.get(key)
+                if waiting_on is None:
+                    # First caller for this key: it makes the model call, the rest wait.
+                    leader_future = self._inflight[key] = Future()
+
         if hit is not None:
             served = replace(hit, cached=True)
             self.stats.record(served)
             return served
 
+        if waiting_on is not None:
+            # Another thread is already asking the model the same question: reuse its
+            # answer (or its failure) instead of paying twice and writing a second line.
+            served = replace(waiting_on.result(), cached=True)
+            self.stats.record(served)
+            return served
+
+        assert leader_future is not None
         try:
             resp = call_backend(self._inner, system, user, temperature)   # outside the lock
-        except Exception:
+        except BaseException as exc:
             self.stats.record_error()
+            with self._lock:
+                self._inflight.pop(key, None)       # a failure is never cached
+            leader_future.set_exception(exc)
             raise
         self._store(key, resp)
+        with self._lock:
+            self._inflight.pop(key, None)
+        leader_future.set_result(resp)
         self.stats.record(resp)
         return resp
 

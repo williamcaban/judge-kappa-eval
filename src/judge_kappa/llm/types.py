@@ -120,6 +120,8 @@ def sanitize_url(url: str | None) -> str | None:
         return None
     parts = urlsplit(url)
     host = parts.hostname or ""
+    if ":" in host:                  # IPv6 literal: urlsplit strips the brackets
+        host = f"[{host}]"
     if parts.port:
         host = f"{host}:{parts.port}"
     return urlunsplit((parts.scheme, host, parts.path, "", ""))

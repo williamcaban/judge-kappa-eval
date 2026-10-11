@@ -253,6 +253,7 @@ class PairwiseCaseResult(BaseModel):
     rationale: str
     parse_failed: bool = False       # judge reply unusable; scores are the 0.5/0.5 fallback
     parse_error: str | None = None
+    truncated: bool = False          # judge reply hit the output-token limit
 
 
 class PairwiseReport(BaseModel):

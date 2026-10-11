@@ -26,7 +26,7 @@ from __future__ import annotations
 import textwrap
 from typing import Any
 
-from judge_kappa.judges.base import LLMJudge
+from judge_kappa.judges.base import LLMJudge, is_finite_number
 from judge_kappa.models import EvalCase, JudgeVerdict
 
 _SYSTEM = textwrap.dedent("""\
@@ -112,9 +112,7 @@ class RankJudge(LLMJudge):
                 return f"missing_rankings:{len(missing)}/{n}"
             vals = [ranks[lab] for lab in labels]
             if any(
-                isinstance(v, bool)
-                or not isinstance(v, int | float)
-                or (isinstance(v, float) and not v.is_integer())
+                not is_finite_number(v) or (isinstance(v, float) and not v.is_integer())
                 for v in vals
             ):
                 return "non_integer_rank"
@@ -133,7 +131,7 @@ class RankJudge(LLMJudge):
             for k, v in rankings_raw.items():
                 try:
                     raw_rankings[str(k)] = int(v)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, OverflowError):
                     continue   # flagged by _validate_rankings; falls back to worst rank below
         rationale: str = str(parsed.get("rationale", parsed.get("_raw", "")))
 

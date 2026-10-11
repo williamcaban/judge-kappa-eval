@@ -14,7 +14,7 @@ thread-safe when ``max_workers > 1``. The built-in backends are.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def validate_max_workers(value: int) -> int:
@@ -26,19 +26,24 @@ def validate_max_workers(value: int) -> int:
 def ordered_map[T, R](fn: Callable[[T], R], items: Iterable[T], max_workers: int = 1) -> list[R]:
     """Apply ``fn`` to every item and return the results in input order.
 
-    The first exception raised by ``fn`` propagates; queued work is cancelled (work
-    already running finishes first). ``max_workers <= 1`` runs inline.
+    The first failure, in *completion* order, propagates immediately: queued work is
+    cancelled and the call does not wait for slower, earlier items (calls already in
+    flight finish in the background). ``max_workers <= 1`` runs inline.
     """
     seq = list(items)
     if max_workers <= 1 or len(seq) <= 1:
         return [fn(x) for x in seq]
-    with ThreadPoolExecutor(
+
+    pool = ThreadPoolExecutor(
         max_workers=min(max_workers, len(seq)), thread_name_prefix="judge-kappa"
-    ) as pool:
-        futures = [pool.submit(fn, x) for x in seq]
-        try:
-            return [f.result() for f in futures]
-        except BaseException:
-            for f in futures:
-                f.cancel()
-            raise
+    )
+    futures = {pool.submit(fn, x): i for i, x in enumerate(seq)}
+    results: list[R | None] = [None] * len(seq)
+    try:
+        for fut in as_completed(futures):
+            results[futures[fut]] = fut.result()
+    except BaseException:
+        pool.shutdown(wait=False, cancel_futures=True)
+        raise
+    pool.shutdown(wait=True)
+    return results  # type: ignore[return-value]
