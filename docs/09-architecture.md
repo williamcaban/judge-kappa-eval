@@ -12,9 +12,14 @@ src/judge_kappa/
 │                          (v0.2: + UpliftSignificance, JudgeFitResult;
 │                                + AgreementResult.alpha_ci_*, icc, icc_interpretation)
 ├── llm/
-│   ├── base.py          # LLMBackend Protocol (structural — duck typing)
-│   ├── openai_backend.py
-│   └── anthropic_backend.py
+│   ├── base.py          # LLMBackend Protocol (structural — duck typing); call_backend()
+│   ├── types.py         # LLMResponse, UsageStats, UsageSnapshot (v0.3.1)
+│   ├── openai_backend.py     # explicit temperature/max_tokens, usage, timeouts (v0.3.1)
+│   ├── anthropic_backend.py  # temperature always sent (v0.3.1)
+│   └── cache.py         # CachedBackend — JSONL response cache, checkpoint/resume (v0.3.1)
+├── concurrency.py       # ordered_map — deterministic opt-in thread pool (v0.3.1)
+├── quality.py           # DataQuality accounting for unusable judge replies (v0.3.1)
+├── provenance.py        # RunMetadata: versions, config, per-backend usage (v0.3.1)
 ├── adapters/
 │   ├── base.py          # InputAdapter ABC
 │   ├── skill.py         # SKILL.md + evals.json → EvalCase list

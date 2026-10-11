@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import textwrap
 
-from judge_kappa.judges.base import LLMJudge
+from judge_kappa.judges.base import LLMJudge, numeric_scores, validate_score_map
 from judge_kappa.models import EvalCase, JudgeVerdict
 
 _SYSTEM = textwrap.dedent("""\
@@ -39,8 +39,15 @@ class AssertionJudge(LLMJudge):
             f"## Assertions to Evaluate\n"
             + "\n".join(f"- {a.text}" for a in case.assertions)
         )
-        parsed = self._parse_json(self._call(system, user))
-        a_scores: dict[str, float] = parsed.get("assertion_scores", {})
+        expected = [a.text for a in case.assertions]
+        reply = self._parse_reply(
+            self._call_full(system, user),
+            case.id,
+            required=("assertion_scores",),
+            validate=lambda d: validate_score_map(d["assertion_scores"], expected, "assertion"),
+        )
+        parsed = reply.data
+        a_scores = numeric_scores(parsed.get("assertion_scores"))
 
         total_weight = sum(a.weight for a in case.assertions)
         score = (
@@ -54,7 +61,10 @@ class AssertionJudge(LLMJudge):
             eval_case_id=case.id,
             variant_name=variant_name,
             score=round(score, 4),
-            rationale=parsed.get("rationale", parsed.get("_raw", "")),
+            rationale=str(parsed.get("rationale", parsed.get("_raw", ""))),
             assertion_scores=a_scores,
             output_token_count=len(output.split()),
+            parse_failed=reply.failed,
+            parse_error=reply.error,
+            truncated=reply.response.truncated,
         )

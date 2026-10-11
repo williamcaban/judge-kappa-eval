@@ -194,3 +194,121 @@ class TestCLIHelpAndErrors:
             from judge_kappa.cli.main import app
             app()
         assert exc.value.code != 0
+
+
+# ── Backend request parameters (config → builder → backend) ───────────────────
+
+
+class TestParseFailurePolicy:
+    def test_default_is_flag_and_values_are_validated(self):
+        from pydantic import ValidationError
+
+        from judge_kappa.cli.config_schema import BackendConfig, JudgeConfig, PositionalJudgeConfig
+
+        backend = BackendConfig(provider="openai", model="m")
+        assert JudgeConfig(id="j", type="assertion", backend=backend).on_parse_failure == "flag"
+        assert PositionalJudgeConfig(id="p", backend=backend).on_parse_failure == "flag"
+        with pytest.raises(ValidationError):
+            JudgeConfig(id="j", type="assertion", backend=backend, on_parse_failure="ignore")
+
+    def test_builder_passes_the_policy_to_the_judge(self, monkeypatch):
+        from judge_kappa.cli import builder
+        from judge_kappa.cli.config_schema import BackendConfig, JudgeConfig, RubricDimensionConfig
+
+        class _Backend:
+            def complete(self, system, user, temperature=0.0):
+                return "{}"
+
+        monkeypatch.setattr(builder, "_build_backend", lambda cfg: _Backend())
+        backend = BackendConfig(provider="openai", model="m")
+        a = builder._build_judge(JudgeConfig(id="a", type="assertion", backend=backend, on_parse_failure="raise"))
+        r = builder._build_judge(JudgeConfig(
+            id="r", type="rubric", backend=backend, on_parse_failure="raise",
+            rubric=[RubricDimensionConfig(name="d", description="d")],
+        ))
+        assert a.on_parse_failure == "raise" and r.on_parse_failure == "raise"
+
+    def test_cli_reports_a_parse_failure_cleanly_instead_of_a_traceback(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        from judge_kappa.cli import main as cli_main
+        from judge_kappa.judges.base import JudgeParseError
+
+        class _Evaluator:
+            def evaluate_dataset(self, **_kw):
+                raise JudgeParseError("j1", "case-7", "invalid_json", "I think so")
+
+        monkeypatch.setattr(cli_main, "build_evaluator", lambda _cfg: _Evaluator())
+        monkeypatch.setattr(cli_main, "load_dataset", lambda _p: [{"id": "c"}])
+        cfg = {
+            "mode": "dataset", "dataset_file": "d.jsonl",
+            "generation": {"backend": {"provider": "openai", "model": "m", "api_key_env": ""}},
+            "panel": {"judges": [{"id": "j1", "type": "assertion",
+                                  "backend": {"provider": "openai", "model": "m", "api_key_env": ""}}]},
+            "control": {"name": "control"}, "treatment": {"name": "treatment"},
+        }
+        path = tmp_path / "c.yaml"
+        path.write_text(yaml.dump(cfg))
+        with patch("sys.argv", ["judge-kappa", "run", str(path)]), pytest.raises(SystemExit) as exc:
+            cli_main.app()
+        assert exc.value.code != 0
+        err = capsys.readouterr().err
+        assert "case-7" in err and "invalid_json" in err and "on_parse_failure: flag" in err
+
+
+class TestBackendRequestParameters:
+    def test_defaults_are_unset(self):
+        from judge_kappa.cli.config_schema import BackendConfig
+
+        cfg = BackendConfig(provider="openai", model="m")
+        assert cfg.max_tokens is None and cfg.omit_temperature is False
+        assert cfg.timeout_s is None and cfg.max_retries is None
+        assert cfg.max_tokens_param == "max_tokens"
+
+    @pytest.mark.parametrize(
+        "bad", [{"max_tokens": 0}, {"timeout_s": 0}, {"max_retries": -1}, {"max_tokens_param": "n"}]
+    )
+    def test_invalid_values_rejected(self, bad):
+        from pydantic import ValidationError
+
+        from judge_kappa.cli.config_schema import BackendConfig
+
+        with pytest.raises(ValidationError):
+            BackendConfig(provider="openai", model="m", **bad)
+
+    def test_builder_forwards_options_to_openai_backend(self, monkeypatch):
+        from judge_kappa.cli import builder
+        from judge_kappa.cli.config_schema import BackendConfig
+
+        seen: dict = {}
+
+        class _Fake:
+            def __init__(self, **kw):
+                seen.update(kw)
+
+        monkeypatch.setattr(builder, "OpenAIBackend", _Fake)
+        builder._build_backend(BackendConfig(
+            provider="openai", model="m", api_key_env="", base_url="http://x/v1",
+            max_tokens=256, max_tokens_param="max_completion_tokens",
+            omit_temperature=True, timeout_s=9.0, max_retries=1,
+        ))
+        assert seen["max_tokens"] == 256 and seen["max_tokens_param"] == "max_completion_tokens"
+        assert seen["omit_temperature"] is True
+        assert seen["timeout_s"] == 9.0 and seen["max_retries"] == 1
+
+    def test_builder_anthropic_uses_backend_default_when_unset(self, monkeypatch):
+        from judge_kappa.cli import builder
+        from judge_kappa.cli.config_schema import BackendConfig
+
+        seen: dict = {}
+
+        class _Fake:
+            def __init__(self, **kw):
+                seen.update(kw)
+
+        monkeypatch.setattr(builder, "AnthropicBackend", _Fake)
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
+        builder._build_backend(BackendConfig(provider="anthropic", model="claude-x"))
+        assert "max_tokens" not in seen            # backend default (2048) applies
+        builder._build_backend(BackendConfig(provider="anthropic", model="claude-x", max_tokens=900))
+        assert seen["max_tokens"] == 900

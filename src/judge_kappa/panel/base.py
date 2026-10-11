@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from judge_kappa.judges.base import LLMJudge
 from judge_kappa.models import EvalCase, JudgeVerdict
 
 
@@ -24,3 +25,8 @@ class EvaluationPanel(ABC):
     @abstractmethod
     def judge_ids(self) -> list[str]:
         ...
+
+    @property
+    def judges(self) -> list[LLMJudge]:
+        """The panel's judge objects (used for run provenance). Custom panels may override."""
+        return []

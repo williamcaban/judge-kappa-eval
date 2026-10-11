@@ -20,7 +20,8 @@ import yaml
 
 from judge_kappa.cli.builder import build_evaluator, load_dataset
 from judge_kappa.cli.config_schema import DatasetModeConfig, PairwiseModeConfig, SkillModeConfig
-from judge_kappa.models import EvalReport
+from judge_kappa.judges.base import JudgeParseError
+from judge_kappa.models import DataQuality, EvalReport, RunMetadata
 
 
 def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig | PairwiseModeConfig:
@@ -68,7 +69,28 @@ def _render_text(report: EvalReport) -> str:
             f"  ctrl={c.control.score:.3f}  trt={c.treatment.score:.3f}"
             f"{alpha_str}{flag}"
         )
+    lines += _render_quality(report.data_quality, report.run)
     return "\n".join(lines)
+
+
+def _render_quality(dq: DataQuality, run: RunMetadata | None) -> list[str]:
+    """Data-quality warnings and a usage line; shown only when there is something to say."""
+    lines: list[str] = []
+    if dq.warnings:
+        lines += ["", "Data quality warnings:"]
+        lines += [f"  ⚠ {w}" for w in dq.warnings]
+    if run is not None:
+        calls = sum(b.usage.calls for b in run.backends if b.usage)
+        hits = sum(b.usage.cache_hits for b in run.backends if b.usage)
+        tin = sum(b.usage.input_tokens for b in run.backends if b.usage)
+        tout = sum(b.usage.output_tokens for b in run.backends if b.usage)
+        if calls:
+            lines += [
+                "",
+                f"LLM calls: {calls} ({hits} from cache)  tokens in/out: {tin}/{tout}"
+                f"  duration: {run.duration_s:.1f}s",
+            ]
+    return lines
 
 
 def _write_output(content: str, file: str | None) -> None:
@@ -98,13 +120,16 @@ def cmd_run(config_path: str, output_file: str | None, fmt: str, include_verdict
         backend = _build_backend(config.pairwise_judge.backend)
         cal = _build_calibration(config.pairwise_judge.calibration)
         pj = PairwiseJudge(config.pairwise_judge.id, backend, calibration_examples=cal,
-                           temperature=config.pairwise_judge.temperature)
+                           temperature=config.pairwise_judge.temperature,
+                           on_parse_failure=config.pairwise_judge.on_parse_failure)
         gen_backend = _build_backend(config.generation.backend)
         # JudgePanel with a single assertion judge as a placeholder — pairwise mode
         # never calls panel.evaluate(); it calls evaluate_pairwise_dataset() directly.
         from judge_kappa.judges.assertion import AssertionJudge
         panel = JudgePanel(judges=[AssertionJudge("_placeholder", gen_backend)])
-        evaluator = JuryEvaluator(panel=panel, generation_backend=gen_backend)
+        evaluator = JuryEvaluator(
+            panel=panel, generation_backend=gen_backend, max_workers=config.max_workers
+        )
         data = load_dataset(config.dataset_file)
         pairwise_report = evaluator.evaluate_pairwise_dataset(
             data=data,
@@ -126,6 +151,9 @@ def cmd_run(config_path: str, output_file: str | None, fmt: str, include_verdict
                 f"System B: {pairwise_report.label_b:<20} preferred: {pairwise_report.preference_rate_b:.1%}"
                 f"  mean score: {pairwise_report.mean_score_b:.3f}\n"
                 f"Ties:                               {pairwise_report.tie_rate:.1%}\n"
+                + "\n".join(
+                    _render_quality(pairwise_report.data_quality, pairwise_report.run)
+                ).lstrip("\n")
             )
         out = output_file or config.output.file
         _write_output(content, out)
@@ -242,7 +270,14 @@ def app() -> None:
         if fmt not in ("json", "text", "jsonl"):
             _die(f"--format must be json, text, or jsonl. Got: {fmt!r}")
 
-        cmd_run(config_path, output_file, fmt, include_verdicts)
+        try:
+            cmd_run(config_path, output_file, fmt, include_verdicts)
+        except JudgeParseError as exc:
+            _die(
+                f"{exc}\n"
+                "Set `on_parse_failure: flag` on the judge to keep going and count "
+                "unusable replies in the report's data_quality instead."
+            )
 
     else:
         _die(f"Unknown command: {cmd!r}. Run 'judge-kappa --help'.")

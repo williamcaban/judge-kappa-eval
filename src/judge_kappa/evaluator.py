@@ -44,8 +44,9 @@ from judge_kappa.agreement.kappa import CohenKappa
 from judge_kappa.agreement.personfit import PersonFitAnalyzer
 from judge_kappa.bias.positional import PositionalBiasDetector, PositionalBiasReport
 from judge_kappa.bias.verbosity import VerbosityBiasDetector
+from judge_kappa.concurrency import ordered_map, validate_max_workers
 from judge_kappa.judges.pairwise import PairwiseJudge
-from judge_kappa.llm.base import LLMBackend
+from judge_kappa.llm.base import LLMBackend, call_backend
 from judge_kappa.models import (
     AgreementResult,
     BiasResult,
@@ -63,6 +64,8 @@ from judge_kappa.models import (
     VariantResult,
 )
 from judge_kappa.panel.base import EvaluationPanel
+from judge_kappa.provenance import begin_run, end_run, generation_truncations
+from judge_kappa.quality import ReplyFlag, compute_data_quality
 
 
 def _mcnemar_and_ci(
@@ -131,7 +134,7 @@ def _run_variant(variant: Variant, case: EvalCase, default_backend: LLMBackend) 
     if variant.skill_context:
         parts.append(f"## Skill Instructions\n{variant.skill_context}")
     system = "\n\n".join(parts) or "You are a helpful assistant."
-    return backend.complete(system=system, user=case.prompt, temperature=variant.temperature)
+    return call_backend(backend, system, case.prompt, variant.temperature).text
 
 
 class JuryEvaluator:
@@ -147,7 +150,16 @@ class JuryEvaluator:
         compute_judge_fit: bool = True,
         bootstrap_ci: bool = True,
         n_bootstrap: int = 2000,
+        max_workers: int = 1,
     ) -> None:
+        """
+        Args:
+            max_workers: Cases evaluated concurrently (threads). 1, the default, runs
+                strictly sequentially. Results are identical for any value: they are
+                assembled in case order. ``predict_fn`` callables and custom backends
+                must be thread-safe when this is above 1.
+        """
+        self._max_workers = validate_max_workers(max_workers)
         self._panel = panel
         self._gen_backend = generation_backend
         self._scale_type = scale_type
@@ -304,9 +316,10 @@ class JuryEvaluator:
         Pairs are presented to the judge in both orders to detect positional bias
         at the corpus level (positional_bias_rate in the report).
         """
-        results: list[PairwiseCaseResult] = []
+        run_state = begin_run(judges=[pairwise_judge])
 
-        for i, row in enumerate(data):
+        def _judge_row(item: tuple[int, dict[str, object]]) -> PairwiseCaseResult:
+            i, row = item
             inputs_obj = row.get("inputs", {})
             inputs: dict[str, object] = inputs_obj if isinstance(inputs_obj, dict) else {}
             case = EvalCase(
@@ -321,7 +334,7 @@ class JuryEvaluator:
             preferred = label_a if va.score > vb.score else (
                 label_b if vb.score > va.score else "tie"
             )
-            results.append(PairwiseCaseResult(
+            return PairwiseCaseResult(
                 case_id=case.id,
                 prompt=case.prompt,
                 output_a=out_a,
@@ -332,7 +345,12 @@ class JuryEvaluator:
                 score_b=vb.score,
                 preferred=preferred,
                 rationale=va.rationale,
-            ))
+                parse_failed=va.parse_failed,
+                parse_error=va.parse_error,
+                truncated=va.truncated,
+            )
+
+        results = ordered_map(_judge_row, list(enumerate(data)), self._max_workers)
 
         n = len(results)
         pref_a = sum(1 for r in results if r.preferred == label_a) / n if n else 0.0
@@ -349,7 +367,58 @@ class JuryEvaluator:
             label_a=label_a,
             label_b=label_b,
             judge_id=pairwise_judge.judge_id,
+            data_quality=compute_data_quality(
+                (pairwise_judge.judge_id, r.parse_error, r.truncated) for r in results
+            ),
+            run=end_run(run_state, settings={
+                "mode": "pairwise_dataset", "n_cases": n,
+                "label_a": label_a, "label_b": label_b,
+            }),
         )
+
+    def _evaluate_case(
+        self, case: EvalCase, control: Variant, treatment: Variant
+    ) -> tuple[CaseResult, PositionalBiasReport | None]:
+        """Generate, judge and score one case. Independent of every other case."""
+        ctrl_output = _run_variant(control,   case, self._gen_backend)
+        trt_output  = _run_variant(treatment, case, self._gen_backend)
+
+        ctrl_verdicts = self._panel.evaluate(case, ctrl_output, control.name)
+        trt_verdicts  = self._panel.evaluate(case, trt_output,  treatment.name)
+        case_verdicts = ctrl_verdicts + trt_verdicts
+
+        ctrl_score = self._panel.aggregate_score(ctrl_verdicts)
+        trt_score  = self._panel.aggregate_score(trt_verdicts)
+
+        # Per-case agreement (meaningful only with ≥ 2 judges)
+        case_agreement = AgreementResult()
+        if len(ctrl_verdicts) >= 2:
+            case_agreement = self._alpha_metric.compute(ctrl_verdicts, self._scale_type)
+
+        # Positional bias test
+        pos_report: PositionalBiasReport | None = None
+        if self._positional_detector:
+            pos_report = self._positional_detector.test_case(case, ctrl_output, trt_output)
+
+        return CaseResult(
+            case_id=case.id,
+            control=VariantResult(
+                variant_name=control.name,
+                output=ctrl_output,
+                score=ctrl_score,
+                token_count=len(ctrl_output.split()),
+            ),
+            treatment=VariantResult(
+                variant_name=treatment.name,
+                output=trt_output,
+                score=trt_score,
+                token_count=len(trt_output.split()),
+            ),
+            uplift=round(trt_score - ctrl_score, 4),
+            verdicts=case_verdicts,
+            agreement=case_agreement,
+            positional_flip=pos_report.positional_flip if pos_report else False,
+        ), pos_report
 
     def evaluate(
         self,
@@ -361,54 +430,25 @@ class JuryEvaluator:
         pos_reports:  list[PositionalBiasReport] = []
         case_results: list[CaseResult] = []
 
-        for case in cases:
-            ctrl_output = _run_variant(control,   case, self._gen_backend)
-            trt_output  = _run_variant(treatment, case, self._gen_backend)
+        run_state = begin_run(
+            judges=[*self._panel.judges, *([self._positional_judge] if self._positional_judge else [])],
+            backends=[
+                ("generation", self._gen_backend),
+                ("generation", control.generation_backend),
+                ("generation", treatment.generation_backend),
+            ],
+        )
 
-            ctrl_verdicts = self._panel.evaluate(case, ctrl_output, control.name)
-            trt_verdicts  = self._panel.evaluate(case, trt_output,  treatment.name)
-            case_verdicts = ctrl_verdicts + trt_verdicts
-            all_verdicts.extend(case_verdicts)
-
-            ctrl_score = self._panel.aggregate_score(ctrl_verdicts)
-            trt_score  = self._panel.aggregate_score(trt_verdicts)
-
-            # Per-case agreement (meaningful only with ≥ 2 judges)
-            case_agreement = AgreementResult()
-            if len(ctrl_verdicts) >= 2:
-                case_agreement = self._alpha_metric.compute(
-                    ctrl_verdicts, self._scale_type
-                )
-
-            # Positional bias test
-            if self._positional_detector:
-                report = self._positional_detector.test_case(
-                    case, ctrl_output, trt_output
-                )
-                pos_reports.append(report)
-                pos_flag = report.positional_flip
-            else:
-                pos_flag = False
-
-            case_results.append(CaseResult(
-                case_id=case.id,
-                control=VariantResult(
-                    variant_name=control.name,
-                    output=ctrl_output,
-                    score=ctrl_score,
-                    token_count=len(ctrl_output.split()),
-                ),
-                treatment=VariantResult(
-                    variant_name=treatment.name,
-                    output=trt_output,
-                    score=trt_score,
-                    token_count=len(trt_output.split()),
-                ),
-                uplift=round(trt_score - ctrl_score, 4),
-                verdicts=case_verdicts,
-                agreement=case_agreement,
-                positional_flip=pos_flag,
-            ))
+        evaluated = ordered_map(
+            lambda case: self._evaluate_case(case, control, treatment),
+            cases,
+            self._max_workers,
+        )
+        for case_result, pos_report in evaluated:
+            case_results.append(case_result)
+            all_verdicts.extend(case_result.verdicts)
+            if pos_report is not None:
+                pos_reports.append(pos_report)
 
         # Corpus-level agreement (α with bootstrap CI + κ)
         corpus_alpha  = self._alpha_metric.compute(all_verdicts, self._scale_type)
@@ -459,6 +499,28 @@ class JuryEvaluator:
             else []
         )
 
+        replies: list[ReplyFlag] = [(v.judge_id, v.parse_error, v.truncated) for v in all_verdicts]
+        if self._positional_judge is not None:
+            replies += [
+                (self._positional_judge.judge_id, r.parse_error, r.truncated) for r in pos_reports
+            ]
+        data_quality = compute_data_quality(
+            replies, extra_truncated=generation_truncations(run_state)
+        )
+        run_metadata = end_run(run_state, settings={
+            "mode": "ab_evaluation",
+            "n_cases": len(cases),
+            "scale_type": str(self._scale_type),
+            "compute_significance": self._compute_significance,
+            "compute_icc": self._compute_icc,
+            "n_bootstrap": self._n_bootstrap,
+            "max_workers": self._max_workers,
+            "verbosity_bias_threshold": self._verbosity_threshold,
+            "positional_judge": self._positional_judge.judge_id if self._positional_judge else None,
+            "control": control.name,
+            "treatment": treatment.name,
+        })
+
         uplift_vals = [r.uplift for r in case_results]
         return EvalReport(
             cases=case_results,
@@ -475,4 +537,6 @@ class JuryEvaluator:
             bias=corpus_bias,
             judge_ids=self._panel.judge_ids,
             scale_type=self._scale_type,
+            data_quality=data_quality,
+            run=run_metadata,
         )

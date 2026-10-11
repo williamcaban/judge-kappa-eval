@@ -150,6 +150,7 @@ report.model_dump_json(indent=2)
 | `docs/09-architecture.md` | Package structure, ABCs, data flow diagram |
 | `docs/10-psychometric-methods.md` | Deep guide to all 9 psychometric capabilities |
 | `docs/11-scholarly-references.md` | Full bibliography: 18 techniques × papers/books |
+| `docs/12-reliability-and-reproducibility.md` | Explicit request parameters, parse-failure accounting, provenance, response cache and resume, concurrency |
 | `examples/demo_psychometric.py` | Runnable: CI, ICC, PersonFit, DIF, McNemar (no API key) |
 | `examples/demo_irt_weighting.py` | Runnable: IRT judge weighting (no API key) |
 | `examples/demo_rank_judge.py` | Runnable: RankJudge leaderboard (no API key) |
@@ -187,10 +188,15 @@ src/judge_kappa/
 │   └── dif.py           # Differential Item Functioning
 ├── calibration/
 │   └── irt.py           # IRTJudgeWeighter (2PL MLE)
+├── concurrency.py       # ordered_map: opt-in threads, results independent of scheduling
+├── quality.py           # DataQuality: counts of unusable judge replies
+├── provenance.py        # RunMetadata: versions, config and usage attached to reports
 ├── llm/
 │   ├── base.py          # LLMBackend Protocol — duck typing, any .complete() works
+│   ├── types.py         # LLMResponse, UsageStats
 │   ├── openai_backend.py   # OpenAI-compatible (OpenAI, vLLM, Ollama, Groq, Together)
-│   └── anthropic_backend.py
+│   ├── anthropic_backend.py
+│   └── cache.py         # CachedBackend: JSONL response cache, checkpoint/resume
 └── cli/
     ├── config_schema.py # Pydantic YAML config models
     ├── builder.py       # Config → runtime objects

@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import textwrap
 from dataclasses import dataclass
+from typing import Any
 
-from judge_kappa.judges.base import LLMJudge
+from judge_kappa.judges.base import LLMJudge, is_finite_number
 from judge_kappa.models import EvalCase, JudgeVerdict
 
 _SYSTEM = textwrap.dedent("""\
@@ -32,6 +33,21 @@ _SYSTEM = textwrap.dedent("""\
       "rationale": "<one sentence>"
     }}
 """)
+
+
+def _as_score(value: object, default: float) -> float:
+    """A usable numeric score, or ``default`` when the reply gave something else."""
+    return float(value) if is_finite_number(value) else default
+
+
+def _validate_pair(data: dict[str, Any]) -> str | None:
+    for key in ("score_a", "score_b"):
+        v = data[key]
+        if not is_finite_number(v):
+            return "non_numeric_score"
+        if v < 0.0 or v > 1.0:
+            return "out_of_range_score"
+    return None
 
 
 @dataclass
@@ -63,13 +79,24 @@ class PairwiseJudge(LLMJudge):
             f"## Output A\n{output_a}\n\n"
             f"## Output B\n{output_b}"
         )
-        parsed = self._parse_json(self._call(system, user))
-        pairwise = PairwiseScore(
-            score_a=float(parsed.get("score_a", 0.5)),
-            score_b=float(parsed.get("score_b", 0.5)),
-            preferred=parsed.get("preferred", "tie"),
-            rationale=parsed.get("rationale", parsed.get("_raw", "")),
+        reply = self._parse_reply(
+            self._call_full(system, user),
+            case.id,
+            required=("score_a", "score_b"),
+            validate=_validate_pair,
         )
+        parsed = reply.data
+        pairwise = PairwiseScore(
+            score_a=_as_score(parsed.get("score_a"), 0.5),
+            score_b=_as_score(parsed.get("score_b"), 0.5),
+            preferred=str(parsed.get("preferred", "tie")),
+            rationale=str(parsed.get("rationale", parsed.get("_raw", ""))),
+        )
+        flags: dict[str, Any] = {
+            "parse_failed": reply.failed,
+            "parse_error": reply.error,
+            "truncated": reply.response.truncated,
+        }
 
         verdict_a = JudgeVerdict(
             judge_id=self.judge_id,
@@ -78,6 +105,7 @@ class PairwiseJudge(LLMJudge):
             score=pairwise.score_a,
             rationale=pairwise.rationale,
             output_token_count=len(output_a.split()),
+            **flags,
         )
         verdict_b = JudgeVerdict(
             judge_id=self.judge_id,
@@ -86,5 +114,6 @@ class PairwiseJudge(LLMJudge):
             score=pairwise.score_b,
             rationale=pairwise.rationale,
             output_token_count=len(output_b.split()),
+            **flags,
         )
         return verdict_a, verdict_b

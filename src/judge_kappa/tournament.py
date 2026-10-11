@@ -40,12 +40,15 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
+from judge_kappa.concurrency import ordered_map, validate_max_workers
 from judge_kappa.judges.pairwise import PairwiseJudge
-from judge_kappa.llm.base import LLMBackend
-from judge_kappa.models import EvalCase, Variant
+from judge_kappa.llm.base import LLMBackend, call_backend
+from judge_kappa.models import DataQuality, EvalCase, RunMetadata, Variant
+from judge_kappa.provenance import RunState, begin_run, end_run, generation_truncations
+from judge_kappa.quality import ReplyFlag, compute_data_quality
 from judge_kappa.ranking.btl import ELO_SCALE, ComparisonGame, bootstrap_btl, fit_btl
 
 # ── Output models ─────────────────────────────────────────────────────────────
@@ -91,6 +94,9 @@ class TournamentReport:
     order_identifiable: bool = False           # False when pairs were judged in one order only
     possibly_separated: bool = False           # estimates at the ridge bound: ratings/intervals unreliable
     ci_level: float | None = None
+    # Unusable judge replies (parse_failed) and truncations; see judge_kappa.quality.
+    data_quality: DataQuality = field(default_factory=DataQuality)
+    run: RunMetadata | None = None   # provenance: configuration, versions and usage
 
     def print_leaderboard(self) -> None:
         has_ci = any(s.btl_ci_low is not None for s in self.standings)
@@ -112,6 +118,8 @@ class TournamentReport:
             print(f"Judge order effect (log-odds, + favours first-shown): {self.order_effect:+.2f}{ci_txt}")
         elif not self.order_identifiable:
             print("Judge order effect: not identifiable (pairs were judged in one display order only)")
+        for w in self.data_quality.warnings:
+            print(f"Warning: {w}")
         if self.possibly_separated:
             print("Warning: estimates are at the regularisation bound (a system won or lost every game, "
                   "or the order effect is extreme); ratings and intervals are not reliable.")
@@ -171,6 +179,27 @@ def _compute_elo(
 # ── Main evaluator ────────────────────────────────────────────────────────────
 
 
+def _outcome(first_score: float, second_score: float) -> float:
+    """1.0 if the first score wins, 0.0 if the second does, 0.5 on a tie."""
+    if first_score > second_score:
+        return 1.0
+    if first_score < second_score:
+        return 0.0
+    return 0.5
+
+
+@dataclass
+class _PairCase:
+    """Result of judging one (system pair, case): everything the aggregator needs."""
+
+    a: str
+    b: str
+    games: list[ComparisonGame]
+    scores: tuple[float, float] | None   # order-balanced (a, b) scores; None if nothing usable
+    flip: bool | None                    # first-position win in both rounds; None if untestable
+    replies: list[ReplyFlag]
+
+
 class TournamentEvaluator:
     """
     Compare N evaluation targets (systems) using round-robin pairwise scoring.
@@ -190,6 +219,14 @@ class TournamentEvaluator:
             fewer than 2 cases were run.
         bootstrap_seed: RNG seed for reproducible intervals.
         ci_level: Interval level, in (0, 1).
+        max_workers: (pair, case) games judged concurrently (threads). 1, the default, is
+            strictly sequential. Ratings and counts are identical for any value: games
+            are aggregated in a fixed order. Custom backends must be thread-safe above 1.
+        exclude_parse_failures: When True, a judge reply that could not be parsed is
+            dropped instead of entering the ratings as the 0.5/0.5 fallback tie. A
+            case with no usable round for a pair contributes nothing for that pair.
+            Default False keeps the historical behaviour; failures are counted in
+            ``TournamentReport.data_quality`` either way.
     """
 
     def __init__(
@@ -201,6 +238,8 @@ class TournamentEvaluator:
         n_bootstrap: int = 500,
         bootstrap_seed: int | None = 0,
         ci_level: float = 0.95,
+        exclude_parse_failures: bool = False,
+        max_workers: int = 1,
     ) -> None:
         if rating_method not in ("btl", "elo"):
             raise ValueError("rating_method must be 'btl' or 'elo'")
@@ -215,6 +254,8 @@ class TournamentEvaluator:
         self._n_bootstrap = n_bootstrap
         self._bootstrap_seed = bootstrap_seed
         self._ci_level = ci_level
+        self._exclude_parse_failures = exclude_parse_failures
+        self._max_workers = validate_max_workers(max_workers)
 
     def run(
         self,
@@ -236,6 +277,7 @@ class TournamentEvaluator:
         n = len(system_names)
         if n < 2:
             raise ValueError("Tournament requires at least 2 systems.")
+        run_state = begin_run(judges=[self._judge], backends=[("generation", self._gen_backend)])
 
         # Generate outputs per system per case
         outputs: dict[str, list[str]] = {name: [] for name in system_names}
@@ -247,7 +289,7 @@ class TournamentEvaluator:
                 else:
                     outputs[name].append(str(fn_or_str))
 
-        return self._run_tournament(cases, system_names, outputs)
+        return self._run_tournament(cases, system_names, outputs, run_state)
 
     def run_endpoints(
         self,
@@ -272,6 +314,13 @@ class TournamentEvaluator:
 
         system_names = [v.name for v in variants]
         outputs: dict[str, list[str]] = {v.name: [] for v in variants}
+        run_state = begin_run(
+            judges=[self._judge],
+            backends=[
+                ("generation", self._gen_backend),
+                *(("generation", v.generation_backend) for v in variants),
+            ],
+        )
 
         for case in cases:
             inputs = case.metadata.get("inputs", {"prompt": case.prompt})
@@ -287,11 +336,13 @@ class TournamentEvaluator:
                         parts.append(f"## Skill Instructions\n{variant.skill_context}")
                     system_msg = "\n\n".join(parts) or "You are a helpful assistant."
                     outputs[variant.name].append(
-                        backend.complete(system=system_msg, user=case.prompt,  # type: ignore[union-attr]
-                                         temperature=variant.temperature)
+                        call_backend(
+                            backend,  # type: ignore[arg-type]
+                            system_msg, case.prompt, variant.temperature,
+                        ).text
                     )
 
-        return self._run_tournament(cases, system_names, outputs)
+        return self._run_tournament(cases, system_names, outputs, run_state)
 
     def run_dataset(
         self,
@@ -307,11 +358,59 @@ class TournamentEvaluator:
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
+    def _play(
+        self,
+        a: str,
+        b: str,
+        k: int,
+        case: EvalCase,
+        out_a: str,
+        out_b: str,
+        index: dict[str, int],
+    ) -> _PairCase:
+        """Judge one (pair, case) in one or both display orders. Pure: no shared state."""
+        games: list[ComparisonGame] = []
+        rounds: list[tuple[float, float]] = []
+        replies: list[ReplyFlag] = []
+        skip_failed = self._exclude_parse_failures
+
+        # Round 1: A first
+        va, vb = self._judge.judge_pair(case, out_a, out_b, a, b)
+        replies.append((self._judge.judge_id, va.parse_error, va.truncated))
+        r1_ok = not (skip_failed and va.parse_failed)
+        if r1_ok:
+            games.append(ComparisonGame(k, index[a], index[b], 1, _outcome(va.score, vb.score)))
+            rounds.append((va.score, vb.score))
+
+        flip: bool | None = None
+        if self._detect_positional_bias:
+            # Round 2: B first (swapped)
+            vb2, va2 = self._judge.judge_pair(case, out_b, out_a, b, a)
+            replies.append((self._judge.judge_id, va2.parse_error, va2.truncated))
+            r2_ok = not (skip_failed and va2.parse_failed)
+            if r2_ok:
+                games.append(ComparisonGame(k, index[a], index[b], -1, _outcome(va2.score, vb2.score)))
+                rounds.append((va2.score, vb2.score))
+            if r1_ok and r2_ok:
+                # Positional bias = the first-positioned output wins in both rounds.
+                flip = va.score > vb.score and vb2.score > va2.score
+
+        scores: tuple[float, float] | None = None
+        if rounds:
+            # Balanced Position Calibration: average each system's score over both display
+            # orders so a first-position preference cancels out.
+            scores = (
+                sum(r[0] for r in rounds) / len(rounds),
+                sum(r[1] for r in rounds) / len(rounds),
+            )
+        return _PairCase(a=a, b=b, games=games, scores=scores, flip=flip, replies=replies)
+
     def _run_tournament(
         self,
         cases: list[EvalCase],
         system_names: list[str],
         outputs: dict[str, list[str]],
+        run_state: RunState,
     ) -> TournamentReport:
         """Core: run all-pairs over all cases, compute win matrix and Elo."""
 
@@ -325,56 +424,46 @@ class TournamentEvaluator:
         pos_flips: dict[tuple[str, str], int] = {}
         pair_totals: dict[tuple[str, str], int] = {}
         games: list[ComparisonGame] = []
+        replies: list[ReplyFlag] = []
         index = {name: k for k, name in enumerate(system_names)}
 
-        def _outcome(first_score: float, second_score: float) -> float:
-            if first_score > second_score:
-                return 1.0
-            if first_score < second_score:
-                return 0.0
-            return 0.5
-
+        tasks: list[tuple[str, str, int]] = []
         for i, a in enumerate(system_names):
             for b in system_names[i + 1:]:
-                pair_key = (a, b)
-                pos_flips[pair_key] = 0
-                pair_totals[pair_key] = 0
+                pos_flips[(a, b)] = 0
+                pair_totals[(a, b)] = 0
+                tasks.extend((a, b, k) for k in range(len(cases)))
 
-                for k, case in enumerate(cases):
-                    out_a = outputs[a][k]
-                    out_b = outputs[b][k]
+        results = ordered_map(
+            lambda t: self._play(t[0], t[1], t[2], cases[t[2]], outputs[t[0]][t[2]], outputs[t[1]][t[2]], index),
+            tasks,
+            self._max_workers,
+        )
 
-                    # Round 1: A first
-                    va, vb = self._judge.judge_pair(case, out_a, out_b, a, b)
-                    score_a, score_b = va.score, vb.score
-                    games.append(ComparisonGame(k, index[a], index[b], 1, _outcome(va.score, vb.score)))
+        # Aggregate in task order so the report does not depend on how calls were scheduled.
+        for res in results:
+            a, b = res.a, res.b
+            games.extend(res.games)
+            replies.extend(res.replies)
+            if res.scores is None:
+                continue                      # no usable round for this (pair, case)
+            score_a, score_b = res.scores
+            if res.flip is not None:
+                pair_totals[(a, b)] += 1
+                if res.flip:
+                    pos_flips[(a, b)] += 1
 
-                    if self._detect_positional_bias:
-                        # Round 2: B first (swapped)
-                        vb2, va2 = self._judge.judge_pair(case, out_b, out_a, b, a)
-                        games.append(ComparisonGame(k, index[a], index[b], -1, _outcome(va2.score, vb2.score)))
-                        # Positional bias = first-positioned output wins in both rounds:
-                        #   R1: A is first → A wins (va.score > vb.score)
-                        #   R2: B is first → B wins (vb2.score > va2.score)
-                        if va.score > vb.score and vb2.score > va2.score:
-                            pos_flips[pair_key] += 1
-                        pair_totals[pair_key] += 1
-                        # Balanced Position Calibration: average each system's score over
-                        # both display orders so first-position preference cancels out.
-                        score_a = (va.score + va2.score) / 2.0
-                        score_b = (vb.score + vb2.score) / 2.0
-
-                    score_sums[a][b] += score_a
-                    score_sums[b][a] += score_b
-                    if score_a > score_b:
-                        wins[a][b] += 1
-                        losses[b][a] += 1
-                    elif score_b > score_a:
-                        wins[b][a] += 1
-                        losses[a][b] += 1
-                    else:
-                        ties[a][b] += 1
-                        ties[b][a] += 1
+            score_sums[a][b] += score_a
+            score_sums[b][a] += score_b
+            if score_a > score_b:
+                wins[a][b] += 1
+                losses[b][a] += 1
+            elif score_b > score_a:
+                wins[b][a] += 1
+                losses[a][b] += 1
+            else:
+                ties[a][b] += 1
+                ties[b][a] += 1
 
         n_cases = len(cases)
 
@@ -385,6 +474,7 @@ class TournamentEvaluator:
         for i, a in enumerate(system_names):
             for b in system_names[i + 1:]:
                 total = wins[a][b] + wins[b][a] + ties[a][b]
+                usable = total > 0
                 if total == 0:
                     total = 1
                 rate_a = (wins[a][b] + 0.5 * ties[a][b]) / total
@@ -403,8 +493,10 @@ class TournamentEvaluator:
                     preference_rate_a=round(rate_a, 4),
                     preference_rate_b=round(rate_b, 4),
                     tie_rate=round(ties[a][b] / total, 4),
-                    mean_score_a=round(score_sums[a][b] / n_cases, 4),
-                    mean_score_b=round(score_sums[b][a] / n_cases, 4),
+                    # Mean over the cases that produced a usable round for this pair
+                    # (all cases unless exclude_parse_failures dropped some).
+                    mean_score_a=round(score_sums[a][b] / total, 4) if usable else 0.0,
+                    mean_score_b=round(score_sums[b][a] / total, 4) if usable else 0.0,
                     positional_bias_rate=round(pos_rate, 4),
                 ))
 
@@ -412,9 +504,22 @@ class TournamentEvaluator:
         # orders. Without swaps it is identified solely through intransitive cycles, which
         # is model-dependent and weak, so it is fixed at zero and flagged as not identifiable.
         swap_based = self._detect_positional_bias
-        btl = fit_btl(len(system_names), games, order_effect=swap_based)
+        try:
+            btl = fit_btl(len(system_names), games, order_effect=swap_based)
+        except ValueError as exc:
+            seen = {g.i for g in games} | {g.j for g in games}
+            unrated = [name for name in system_names if index[name] not in seen]
+            raise ValueError(
+                f"cannot rate the systems: {exc}. "
+                f"{sum(1 for r in replies if r[1] is not None)} judge replies were unusable"
+                f"{' and excluded' if self._exclude_parse_failures else ''}"
+                + (f"; no usable game for: {', '.join(unrated)}." if unrated else ".")
+            ) from exc
         boot = None
-        if self._n_bootstrap >= 2 and n_cases >= 2:
+        # Resample over the cases that actually produced a game, not the input case count:
+        # exclusion can leave fewer than two.
+        usable_cases = len({g.case for g in games})
+        if self._n_bootstrap >= 2 and usable_cases >= 2:
             boot = bootstrap_btl(
                 len(system_names), games,
                 n_boot=self._n_bootstrap, ci_level=self._ci_level, seed=self._bootstrap_seed,
@@ -443,6 +548,15 @@ class TournamentEvaluator:
 
         standings.sort(key=lambda s: s.elo, reverse=True)
 
+        quality = compute_data_quality(
+            replies, extra_truncated=generation_truncations(run_state)
+        )
+        if self._n_bootstrap >= 2 and boot is None:
+            quality.warnings.append(
+                f"Confidence intervals omitted: only {usable_cases} case(s) produced a usable "
+                "game, and the bootstrap needs at least 2."
+            )
+
         return TournamentReport(
             standings=standings,
             pair_results=pair_results,
@@ -459,4 +573,16 @@ class TournamentEvaluator:
             order_identifiable=swap_based and btl.order_identifiable,
             possibly_separated=btl.possibly_separated,
             ci_level=self._ci_level if boot else None,
+            data_quality=quality,
+            run=end_run(run_state, settings={
+                "mode": "tournament",
+                "n_systems": len(system_names),
+                "n_cases": n_cases,
+                "rating_method": self._rating_method,
+                "detect_positional_bias": self._detect_positional_bias,
+                "n_bootstrap": self._n_bootstrap,
+                "ci_level": self._ci_level,
+                "exclude_parse_failures": self._exclude_parse_failures,
+                "max_workers": self._max_workers,
+            }),
         )

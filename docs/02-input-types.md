@@ -237,6 +237,9 @@ standings[]:
   win_rate   : 0.75
 win_matrix   : { "gpt-4o": { "llama-70b": 0.65 } }
 pair_results[]: per-pair preference rates and positional bias rates
+# v0.3.1 additions (also on EvalReport and PairwiseReport)
+data_quality : unusable-reply and truncation counts, by judge and code, plus warnings
+run          : RunMetadata: versions, per-judge / per-backend config, usage; no secrets
 # v0.3 additions
 standings[].btl_score / btl_ci_low / btl_ci_high : order-aware BTL score (log-odds) and bootstrap CI
 order_effect / order_effect_ci : judge's display-order effect (log-odds; > 0 favours first-shown)

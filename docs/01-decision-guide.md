@@ -150,6 +150,9 @@ See: docs/10-psychometric-methods.md  (full guide)
 | Score pre-recorded outputs | prerecorded + rubric + panel | `config_prerecorded.yaml` |
 | A/B preference rates | pairwise | `config_pairwise.yaml` |
 | N-system leaderboard (N ≤ 6) | TournamentEvaluator | Python API |
+| Resume an interrupted run / make a re-run free and exact | `CachedBackend` or `backend.cache_path` | `demo_reliability_controls.py` |
+| Know how much judge output was unusable | `report.data_quality`, `on_parse_failure="raise"` | `demo_reliability_controls.py` |
+| Run faster without changing results | `max_workers=N` | `demo_reliability_controls.py` |
 | Quantify a judge's first-position preference (with CI) | PositionalBiasDetector.estimate_order_effect / TournamentEvaluator | `demo_order_aware_ranking.py` |
 | N-system ranking (N ≥ 7) | RankJudge | `demo_rank_judge.py` |
 | Regulatory evidence | skill/dataset + regulatory config | `config_regulatory.yaml` |

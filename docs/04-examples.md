@@ -339,6 +339,30 @@ Judge order effect (log-odds, + favours first-shown): ~+2.9 [~+2.2, ~+4.9]
 
 ---
 
+## 14 — Reliability controls (parse failures, provenance, resume, concurrency)
+
+**When to use:** you run long or paid evaluations and need to know how much judge output was usable, what produced the numbers, how to resume after a failure, and that concurrency does not change results.  
+**Script:** `examples/demo_reliability_controls.py`  
+**No API key required** — deterministic mock judges.
+
+```bash
+python examples/demo_reliability_controls.py
+```
+
+Expected output (abridged):
+```
+1) Unusable judge replies are counted, not silent
+   judge calls: 12  unusable: 4  (33%)  by code: {'invalid_json': 4}
+3) An interrupted tournament resumes from the response cache
+   run 1 stopped after 9 good calls: simulated provider outage
+   run 2 made 15 calls instead of 24 (the rest came from the cache)
+   resumed result identical to the uninterrupted run: True
+4) Concurrency changes the speed, not the result
+   identical standings and win matrix: True
+```
+
+---
+
 ## Example files index
 
 | File | Type | API key? | What it shows |
@@ -354,5 +378,6 @@ Judge order effect (log-odds, + favours first-shown): ~+2.9 [~+2.2, ~+4.9]
 | `config_mixed_panel.yaml` | YAML config | yes | 4 providers in one panel |
 | `demo_psychometric.py` | Python script | **no** | CIs, ICC, person-fit, DIF, McNemar |
 | `demo_order_aware_ranking.py` | Python script | **no** | order-aware BTL ratings, order effect with interval |
+| `demo_reliability_controls.py` | Python script | **no** | parse-failure accounting, provenance, cache resume, concurrency |
 | `demo_irt_weighting.py` | Python script | **no** | IRT judge weighting from calibration data |
 | `demo_rank_judge.py` | Python script | **no** | listwise ranking for N ≥ 7 systems |

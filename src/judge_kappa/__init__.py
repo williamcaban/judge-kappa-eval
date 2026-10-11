@@ -32,23 +32,35 @@ from judge_kappa.bias import (
 from judge_kappa.calibration import IRTJudgeWeighter
 from judge_kappa.evaluator import JuryEvaluator
 from judge_kappa.judges import AssertionJudge, LLMJudge, PairwiseJudge, RankJudge, RubricJudge
-from judge_kappa.llm import AnthropicBackend, LLMBackend, OpenAIBackend
+from judge_kappa.judges.base import JudgeParseError
+from judge_kappa.llm import (
+    AnthropicBackend,
+    CachedBackend,
+    LLMBackend,
+    LLMResponse,
+    OpenAIBackend,
+)
 from judge_kappa.models import (
     AggregationStrategy,
     AgreementResult,
     Assertion,
+    BackendRecord,
     BiasResult,
     CalibrationExample,
     CaseResult,
+    DataQuality,
     EvalCase,
     EvalReport,
     JudgeFitResult,
+    JudgeRecord,
     JudgeVerdict,
     PairwiseCaseResult,
     PairwiseReport,
     RubricDimension,
+    RunMetadata,
     ScaleType,
     UpliftSignificance,
+    UsageSummary,
     Variant,
     VariantResult,
 )
@@ -65,16 +77,17 @@ __all__ = [
     # Evaluator
     "JuryEvaluator",
     # Models
-    "AggregationStrategy", "AgreementResult", "Assertion", "BiasResult",
-    "CalibrationExample", "CaseResult", "EvalCase", "EvalReport",
-    "JudgeFitResult", "JudgeVerdict", "PairwiseCaseResult", "PairwiseReport",
-    "RubricDimension", "ScaleType", "UpliftSignificance", "Variant", "VariantResult",
+    "AggregationStrategy", "AgreementResult", "Assertion", "BackendRecord", "BiasResult",
+    "CalibrationExample", "CaseResult", "DataQuality", "EvalCase", "EvalReport",
+    "JudgeFitResult", "JudgeRecord", "JudgeVerdict", "PairwiseCaseResult", "PairwiseReport",
+    "RubricDimension", "RunMetadata", "ScaleType", "UpliftSignificance", "UsageSummary",
+    "Variant", "VariantResult",
     # Adapters
     "InputAdapter", "SkillAdapter", "DatasetAdapter",
     # Judges
-    "LLMJudge", "AssertionJudge", "RubricJudge", "PairwiseJudge", "RankJudge",
+    "LLMJudge", "AssertionJudge", "RubricJudge", "PairwiseJudge", "RankJudge", "JudgeParseError",
     # LLM backends
-    "LLMBackend", "OpenAIBackend", "AnthropicBackend",
+    "LLMBackend", "OpenAIBackend", "AnthropicBackend", "CachedBackend", "LLMResponse",
     # Panels
     "EvaluationPanel", "JudgePanel", "JudgeJury",
     # Agreement

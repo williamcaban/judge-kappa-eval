@@ -58,6 +58,25 @@ class BackendConfig(BaseModel):
     # ""   → no auth; passes placeholder "no-key" (Ollama, vLLM without token)
     # "MY_VAR" → reads key from environment variable MY_VAR at runtime
 
+    # ── Request parameters (explicit so runs are reproducible and inspectable) ──
+    max_tokens: int | None = Field(default=None, gt=0)
+    # Output-token cap. None → provider default for OpenAI-compatible servers,
+    # 2048 for Anthropic (the API requires a value). Truncated replies are reported.
+    max_tokens_param: Literal["max_tokens", "max_completion_tokens"] = "max_tokens"
+    # Wire name of the cap for OpenAI-compatible servers; OpenAI reasoning models
+    # require "max_completion_tokens".
+    omit_temperature: bool = False
+    # True → never send `temperature` (for models that reject it). Default sends it,
+    # including 0.0.
+    timeout_s: float | None = Field(default=None, gt=0)
+    # Per-request timeout forwarded to the provider SDK. None → SDK default.
+    max_retries: int | None = Field(default=None, ge=0)
+    # SDK-level retries for transient errors (429, 5xx, connection). None → SDK default.
+    cache_path: str | None = None
+    # JSONL response cache. Every reply is stored as it completes, so an interrupted run
+    # resumes by re-running with the same file, and a re-run is exactly reproducible.
+    # Stores prompts and replies in plain text (file mode 0600).
+
 
 class CalibrationConfig(BaseModel):
     prompt: str
@@ -89,6 +108,9 @@ class JudgeConfig(BaseModel):
     backend: BackendConfig
     weight: float = 1.0                   # used by JudgeJury; ignored by JudgePanel
     temperature: float = 0.0
+    on_parse_failure: Literal["flag", "raise"] = "flag"
+    # flag  → keep the historical fallback score, mark the verdict, count it in data_quality
+    # raise → stop the run with JudgeParseError on the first unusable reply
     calibration: list[CalibrationConfig] = Field(default_factory=list)
     rubric: list[RubricDimensionConfig] = Field(default_factory=list)
 
@@ -126,6 +148,7 @@ class PositionalJudgeConfig(BaseModel):
     id: str
     backend: BackendConfig
     temperature: float = 0.0
+    on_parse_failure: Literal["flag", "raise"] = "flag"
     calibration: list[CalibrationConfig] = Field(default_factory=list)
 
 
@@ -148,6 +171,7 @@ class SkillModeConfig(BaseModel):
     scale_type: Literal["nominal", "ordinal", "interval", "ratio"] = "ordinal"
     positional_judge: PositionalJudgeConfig | None = None
     verbosity_bias_threshold: float = 0.30
+    max_workers: int = Field(default=1, ge=1)   # cases / pairs judged concurrently
     output: OutputConfig = Field(default_factory=OutputConfig)
 
 
@@ -162,6 +186,7 @@ class DatasetModeConfig(BaseModel):
     scale_type: Literal["nominal", "ordinal", "interval", "ratio"] = "ordinal"
     positional_judge: PositionalJudgeConfig | None = None
     verbosity_bias_threshold: float = 0.30
+    max_workers: int = Field(default=1, ge=1)   # cases / pairs judged concurrently
     output: OutputConfig = Field(default_factory=OutputConfig)
 
 
@@ -174,6 +199,7 @@ class PairwiseModeConfig(BaseModel):
     output_b_field: str = "output_b"
     label_a: str = "System A"
     label_b: str = "System B"
+    max_workers: int = Field(default=1, ge=1)   # cases / pairs judged concurrently
     output: OutputConfig = Field(default_factory=OutputConfig)
 
 
