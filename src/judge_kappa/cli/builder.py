@@ -27,6 +27,7 @@ from judge_kappa.judges.pairwise import PairwiseJudge
 from judge_kappa.judges.rubric import RubricJudge
 from judge_kappa.llm.anthropic_backend import AnthropicBackend
 from judge_kappa.llm.base import LLMBackend
+from judge_kappa.llm.cache import CachedBackend
 from judge_kappa.llm.openai_backend import OpenAIBackend
 from judge_kappa.models import (
     AggregationStrategy,
@@ -73,6 +74,13 @@ def _resolve_api_key(api_key_env: str | None, provider: str) -> str | None:
 
 
 def _build_backend(cfg: BackendConfig) -> LLMBackend:
+    backend = _build_raw_backend(cfg)
+    if cfg.cache_path:
+        return CachedBackend(backend, cfg.cache_path)
+    return backend
+
+
+def _build_raw_backend(cfg: BackendConfig) -> LLMBackend:
     api_key = _resolve_api_key(cfg.api_key_env, cfg.provider)
     if cfg.provider == "anthropic":
         anthropic_kwargs: dict[str, object] = {
@@ -170,6 +178,7 @@ def build_evaluator(config: SkillModeConfig | DatasetModeConfig) -> JuryEvaluato
         scale_type=ScaleType(config.scale_type),
         positional_judge=pairwise,
         verbosity_bias_threshold=config.verbosity_bias_threshold,
+        max_workers=config.max_workers,
     )
 
 

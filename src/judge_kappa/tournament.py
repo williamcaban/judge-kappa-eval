@@ -43,6 +43,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Literal
 
+from judge_kappa.concurrency import ordered_map, validate_max_workers
 from judge_kappa.judges.pairwise import PairwiseJudge
 from judge_kappa.llm.base import LLMBackend, call_backend
 from judge_kappa.models import DataQuality, EvalCase, RunMetadata, Variant
@@ -218,6 +219,9 @@ class TournamentEvaluator:
             fewer than 2 cases were run.
         bootstrap_seed: RNG seed for reproducible intervals.
         ci_level: Interval level, in (0, 1).
+        max_workers: (pair, case) games judged concurrently (threads). 1, the default, is
+            strictly sequential. Ratings and counts are identical for any value: games
+            are aggregated in a fixed order. Custom backends must be thread-safe above 1.
         exclude_parse_failures: When True, a judge reply that could not be parsed is
             dropped instead of entering the ratings as the 0.5/0.5 fallback tie. A
             case with no usable round for a pair contributes nothing for that pair.
@@ -235,6 +239,7 @@ class TournamentEvaluator:
         bootstrap_seed: int | None = 0,
         ci_level: float = 0.95,
         exclude_parse_failures: bool = False,
+        max_workers: int = 1,
     ) -> None:
         if rating_method not in ("btl", "elo"):
             raise ValueError("rating_method must be 'btl' or 'elo'")
@@ -250,6 +255,7 @@ class TournamentEvaluator:
         self._bootstrap_seed = bootstrap_seed
         self._ci_level = ci_level
         self._exclude_parse_failures = exclude_parse_failures
+        self._max_workers = validate_max_workers(max_workers)
 
     def run(
         self,
@@ -428,10 +434,11 @@ class TournamentEvaluator:
                 pair_totals[(a, b)] = 0
                 tasks.extend((a, b, k) for k in range(len(cases)))
 
-        results = [
-            self._play(a, b, k, cases[k], outputs[a][k], outputs[b][k], index)
-            for a, b, k in tasks
-        ]
+        results = ordered_map(
+            lambda t: self._play(t[0], t[1], t[2], cases[t[2]], outputs[t[0]][t[2]], outputs[t[1]][t[2]], index),
+            tasks,
+            self._max_workers,
+        )
 
         # Aggregate in task order so the report does not depend on how calls were scheduled.
         for res in results:
@@ -563,5 +570,6 @@ class TournamentEvaluator:
                 "n_bootstrap": self._n_bootstrap,
                 "ci_level": self._ci_level,
                 "exclude_parse_failures": self._exclude_parse_failures,
+                "max_workers": self._max_workers,
             }),
         )

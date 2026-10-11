@@ -6,11 +6,13 @@ from judge_kappa.llm.base import (
     call_backend,
     describe_backend,
 )
+from judge_kappa.llm.cache import CachedBackend
 from judge_kappa.llm.openai_backend import OpenAIBackend
 from judge_kappa.llm.types import LLMResponse, UsageSnapshot, UsageStats
 
 __all__ = [
     "AnthropicBackend",
+    "CachedBackend",
     "LLMBackend",
     "LLMResponse",
     "OpenAIBackend",

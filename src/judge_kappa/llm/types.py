@@ -81,7 +81,10 @@ class UsageStats:
         with self._lock:
             self._calls += 1
             if resp.cached:
+                # A cache hit costs nothing: count the call and the hit, not tokens or latency,
+                # so token totals reflect what was actually billed.
                 self._cache_hits += 1
+                return
             if resp.truncated:
                 self._truncated += 1
             if resp.input_tokens is None and resp.output_tokens is None:
