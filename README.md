@@ -24,6 +24,7 @@ Unified LLM evaluation that bridges **agent-skills-eval** (A/B uplift, assertion
 | Behavioral alignment metric (DISC-style) | ❌ | ❌ | ✅ |
 | Pairwise preference rates | ❌ | ❌ | ✅ |
 | N-system Elo tournament (N ≤ 6) | ❌ | ❌ | ✅ |
+| Order-aware BTL ratings + order-effect interval | ❌ | ❌ | ✅ |
 | Listwise ranking for N ≥ 7 (RankJudge) | ❌ | ❌ | ✅ |
 | CLI-first | ✅ | ❌ | ✅ |
 
@@ -111,10 +112,10 @@ python examples/demo_rank_judge.py
 | [Decision guide](docs/01-decision-guide.md) | Which mode to use — decision tree covering input format, judge strategy, bias detection, N systems, psychometric rigor, and providers |
 | [Input types](docs/02-input-types.md) | All entry points: `evaluate_skill`, `evaluate_dataset`, `evaluate_endpoints`, `evaluate_prerecorded`, `evaluate_pairwise_dataset`, `TournamentEvaluator`, `RankJudge` |
 | [Pairwise, Tournament, and Listwise](docs/03-pairwise-tournament.md) | Pairwise preference, N-system Elo tournament, RankJudge (N ≥ 7), champion-challenger; cost tables; mode selection guide |
-| [Examples](docs/04-examples.md) | 12 worked examples: 9 YAML configs + 3 Python demos with expected output |
+| [Examples](docs/04-examples.md) | 13 worked examples: 9 YAML configs + 4 Python demos with expected output |
 | [Key management](docs/05-key-management.md) | `api_key_env` three-case rule; provider quick reference; mixed-provider panel |
 | [CLI reference](docs/06-cli-reference.md) | `run`, `validate`, `schema` commands; output formats; `--verdicts` flag; CI/CD integration |
-| [Python API](docs/07-python-api.md) | 13 usage patterns; all new v0.2 patterns (McNemar, IRT weighting, RankJudge, DIF, behavioral alignment); report field reference |
+| [Python API](docs/07-python-api.md) | 14 usage patterns; all new v0.2 patterns (McNemar, IRT weighting, RankJudge, DIF, behavioral alignment); report field reference |
 | [Config reference](docs/08-config-reference.md) | Every YAML field documented; skill/dataset/pairwise mode schemas |
 | [Architecture](docs/09-architecture.md) | Package structure; ABCs and extension points; data flow diagram |
 | [Psychometric methods](docs/10-psychometric-methods.md) | In-depth guide to all 9 psychometric capabilities: when to use, API, interpretation tables |

@@ -15,6 +15,7 @@ judge-kappa has six entry points covering every way you might have system output
 | `evaluate_pairwise_dataset` | Pre-recorded A/B pairs | **No** | `PairwiseReport` (preference rates) |
 | `TournamentEvaluator` | N ≤ 6 systems (callables or endpoints) | Only if using `run_endpoints` | `TournamentReport` (Elo leaderboard) |
 | `RankJudge.rank()` | N ≥ 7 systems, listwise (v0.2) | Caller generates; judge ranks | `dict[system → JudgeVerdict]` |
+| `fit_btl` / `bootstrap_btl` | Your own judged comparisons (`ComparisonGame`, v0.3) | **No** | `BTLFit` / `BTLBootstrap` |
 
 ---
 
@@ -236,6 +237,10 @@ standings[]:
   win_rate   : 0.75
 win_matrix   : { "gpt-4o": { "llama-70b": 0.65 } }
 pair_results[]: per-pair preference rates and positional bias rates
+# v0.3 additions
+standings[].btl_score / btl_ci_low / btl_ci_high : order-aware BTL score (log-odds) and bootstrap CI
+order_effect / order_effect_ci : judge's display-order effect (log-odds; > 0 favours first-shown)
+order_identifiable / possibly_separated : design and fit diagnostics
 ```
 
 Use when you need a ranked leaderboard across N systems.

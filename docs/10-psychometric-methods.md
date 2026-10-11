@@ -16,6 +16,7 @@ judge-kappa v0.2 adds nine psychometrically grounded capabilities. This document
 | McNemar + bootstrap CI for uplift | `JuryEvaluator` (`compute_significance=True`) | `demo_psychometric.py` §6 |
 | IRT-based judge weighting | `IRTJudgeWeighter` | `demo_irt_weighting.py` |
 | Listwise ranking for N ≥ 7 | `RankJudge` | `demo_rank_judge.py` |
+| Order-aware BTL ranking + display-order effect | `fit_btl`, `bootstrap_btl`, `TournamentEvaluator`, `PositionalBiasDetector.estimate_order_effect` | `demo_order_aware_ranking.py` |
 | Accurate verbosity tokens | `pip install judge-kappa[tiktoken]` | (automatic) |
 
 Run all demos without an API key:
@@ -25,6 +26,7 @@ cd judge-kappa-eval
 python examples/demo_psychometric.py    # sections 1–6: analytics metrics
 python examples/demo_irt_weighting.py   # section 7: IRT judge weighting
 python examples/demo_rank_judge.py      # section 8: RankJudge leaderboard
+python examples/demo_order_aware_ranking.py  # section 10: order-aware BTL ranking
 ```
 
 ---
@@ -474,6 +476,62 @@ print(result.verbosity_bias_rho, result.verbosity_bias_p, result.verbosity_biase
 ```
 
 For judges that generate output, set `output_token_count` in `JudgeVerdict` using a proper tokenizer in your custom judge subclass.
+
+---
+
+## 10 — Order-aware BTL ranking and the display-order effect
+
+### Why it matters
+
+A pairwise judge may prefer whichever response is shown first. The flip rate detects this but does not correct rankings, and it conflates position bias with a judge that is simply right in both orders. An order-aware Bradley-Terry model estimates the order effect *jointly* with item quality, so rankings are adjusted and the effect is reported with an interval.
+
+### Model
+
+For items i, j shown in order a (+1 = i first, -1 = j first):
+
+```
+logit P(i preferred over j) = s_i - s_j + a * b
+```
+
+`s` are centred latent scores (log-odds) and `b` is the judge's order effect (`b > 0` favours the first-shown response). `b` is fitted only when both display orders were observed; otherwise it is fixed at zero and reported as not identifiable. Scores are estimated by ridge-penalised maximum likelihood (`l2=1e-4`) so the fit stays finite under complete separation; `possibly_separated` flags such cases. Cases are the resampling unit for bootstrap intervals, which keeps pairs judged on the same prompt together.
+
+### Usage
+
+```python
+from judge_kappa import ComparisonGame, fit_btl, bootstrap_btl
+
+games = [
+    # case id, item i, item j, order (+1: i shown first), outcome (1 i wins, 0 j wins, 0.5 tie)
+    ComparisonGame(0, 0, 1, +1, 1.0),
+    ComparisonGame(0, 0, 1, -1, 0.0),
+    ...
+]
+fit = fit_btl(n_items=2, games=games)
+print(fit.scores, fit.order_effect, fit.order_identifiable, fit.possibly_separated)
+boot = bootstrap_btl(2, games, n_boot=500, seed=0)
+print(boot.scores_low, boot.scores_high, boot.order_effect_low, boot.order_effect_high)
+```
+
+`TournamentEvaluator` and `PositionalBiasDetector` build the games for you and expose the results as `TournamentReport.order_effect` and `BiasResult.order_effect`.
+
+### Interpretation and limits
+
+- Outcomes are ordinal (win/tie/loss per game); score margins are not used by the BTL fit.
+- A single constant order effect per judge is assumed. Effects that vary by pair or case are not modelled.
+- Single judge only. Multi-judge structure (shared consensus plus disagreement) and calibration to human labels are described in the DIAL paper but not implemented here.
+- Standard errors on `BTLFit` are Wald approximations; use `bootstrap_btl` for reporting.
+
+### Validation
+
+`tests/test_ranking_btl.py` checks a hand-derived two-item closed form, an independent scikit-learn logistic-regression oracle, truth recovery on simulated data, label-swap invariance, separation handling, and bootstrap behaviour.
+
+### Demo
+
+```bash
+python examples/demo_order_aware_ranking.py
+```
+
+No API key required.
 
 ---
 

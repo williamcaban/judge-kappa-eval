@@ -38,17 +38,19 @@ src/judge_kappa/
 │   └── behavioral.py    # BehavioralAlignmentMetric — DISC-style (v0.2)
 ├── bias/
 │   ├── base.py          # BiasDetector ABC
-│   ├── positional.py    # PositionalBiasDetector — A/B swap test
+│   ├── positional.py    # PositionalBiasDetector — A/B swap test + order effect (v0.3)
 │   ├── verbosity.py     # VerbosityBiasDetector — Spearman ρ(length, score)
 │   └── dif.py           # DifferentialItemFunctioningDetector (v0.2)
 ├── calibration/
 │   └── irt.py           # IRTJudgeWeighter — 2PL MLE judge weights (v0.2)
+├── ranking/
+│   └── btl.py           # Order-aware Bradley-Terry fit, bootstrap CIs (v0.3)
 ├── cli/
 │   ├── config_schema.py # Pydantic config models (YAML schema)
 │   ├── builder.py       # Config → runtime objects
 │   └── main.py          # CLI entry point (no external deps)
 ├── tournament.py         # TournamentEvaluator — round-robin pairwise
-│                           (v0.2: positional bias logic corrected)
+│                           (v0.3: order-balanced counts, BTL ratings + CIs)
 └── evaluator.py          # JuryEvaluator — main orchestrator
                             (v0.2: McNemar, ICC, PersonFit, bootstrap CI)
 ```

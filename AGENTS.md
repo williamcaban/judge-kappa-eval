@@ -52,7 +52,9 @@ The following table maps each implemented capability to its primary scholarly so
 | Behavioral alignment metric | `BehavioralAlignmentMetric` | Krippendorff (2004) — α repurposed cross-condition |
 | Positional bias detection | `PositionalBiasDetector` | Ko et al. (2020) *EMNLP*; Zheng et al. (2023) arXiv:2306.05685 |
 | Verbosity bias detection | `VerbosityBiasDetector` | Saito et al. (2023) arXiv:2310.10076 |
-| Elo rating (tournament) | `TournamentEvaluator` | Elo (1978) *The Rating of Chessplayers*; Zheng et al. (2023) |
+| Elo rating (tournament) | `TournamentEvaluator(rating_method="elo")` | Elo (1978) *The Rating of Chessplayers*; Zheng et al. (2023) |
+| Order-aware BTL ranking, display-order effect | `fit_btl`, `bootstrap_btl`, `TournamentEvaluator`, `PositionalBiasDetector.estimate_order_effect` | Bradley & Terry (1952) *Biometrika* 39; Davidson & Beaver (1977) *Biometrics* 33(4); Augustin (2004) *BJMSP* 57(2) |
+| Balanced position calibration | `TournamentEvaluator` (order-balanced counts) | Wang et al. (2024) *ACL* |
 | ICL calibration alignment | `LLMJudge._icl_block()` | Brown et al. (2020) *NeurIPS* 33; Kim et al. (2024) *ICLR* |
 | LLM-as-judge paradigm | All `LLMJudge` subclasses | Zheng et al. (2023) arXiv:2306.05685 |
 | Listwise ranking | `RankJudge` | Cao et al. (2007) *ICML*; Liu et al. (2023) *EMNLP* |
@@ -160,7 +162,9 @@ report.model_dump_json(indent=2)
 src/judge_kappa/
 ├── models.py            # All Pydantic domain models — start here to understand data contracts
 ├── evaluator.py         # JuryEvaluator — main orchestrator; all EvalReport fields computed here
-├── tournament.py        # TournamentEvaluator — Elo + positional bias
+├── tournament.py        # TournamentEvaluator — order-balanced counts, BTL ratings + CIs
+├── ranking/
+│   └── btl.py           # Order-aware Bradley-Terry fit + case bootstrap
 ├── adapters/            # Input: SKILL.md→EvalCase, list[dict]→EvalCase
 ├── judges/
 │   ├── base.py          # LLMJudge ABC + ICL alignment mixin (_parse_json, _icl_block)
@@ -178,7 +182,7 @@ src/judge_kappa/
 │   ├── personfit.py     # PersonFitAnalyzer (outfit MNSQ)
 │   └── behavioral.py    # BehavioralAlignmentMetric
 ├── bias/
-│   ├── positional.py    # A/B swap test
+│   ├── positional.py    # A/B swap test + order-effect estimate
 │   ├── verbosity.py     # Spearman ρ(length, score)
 │   └── dif.py           # Differential Item Functioning
 ├── calibration/

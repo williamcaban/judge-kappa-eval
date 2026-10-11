@@ -18,6 +18,25 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Order-aware Bradley-Terry ranking** (`judge_kappa.ranking`): `fit_btl`,
+  `bootstrap_btl`, `ComparisonGame`, `order_effect_identifiable`. Estimates item
+  scores and a single judge-level display-order effect by ridge-penalised maximum
+  likelihood, with identifiability checks (rank / cycle criterion), a separation
+  flag, Wald standard errors, and case-level bootstrap intervals.
+  Validated against a hand-derived two-item closed form and an independent
+  scikit-learn logistic-regression oracle (`tests/test_ranking_btl.py`).
+- `PositionalBiasDetector.estimate_order_effect()` and additive
+  `BiasResult.order_effect` / `order_effect_ci_low` / `order_effect_ci_high`,
+  populated by `JuryEvaluator` when a positional judge is configured.
+- `TournamentEvaluator(rating_method=, n_bootstrap=, bootstrap_seed=, ci_level=)`;
+  `TournamentStanding.btl_score` / `btl_ci_low` / `btl_ci_high`;
+  `TournamentReport.order_effect` / `order_effect_ci` / `order_identifiable` /
+  `possibly_separated` / `rating_method` / `ci_level`. Leaderboard prints the
+  interval column and the judge order effect.
+- `examples/demo_order_aware_ranking.py` (no API key) and docs: 03, 04, 07, 09, 10 §10, 11 §19-21.
+- Design inspired by the issue #5 review of DIAL (arXiv:2609.31215). Only the
+  single-judge order-effect stage is implemented; no DIAL code is used.
+
 - Reference-value and synthetic-recovery tests for eight agreement/bias/
   calibration capabilities, closing a gap where 5 (ICC, PersonFit, DIF, IRT,
   BehavioralAlignment) had zero test coverage and the remaining 3
@@ -45,6 +64,25 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     (detailed in test docstrings) that currently prevents a clean
     "inject known effect, verify detection" test; flagged for maintainer
     follow-up rather than silently patched.
+
+### Changed
+
+- **Tournament scoring is now order-balanced.** Previously the swapped round fed
+  only the positional flip rate; win/loss/tie counts, `win_matrix` and Elo came
+  from round 1 alone, so detected position bias was never corrected (and the docs
+  claimed otherwise). With `detect_positional_bias=True` (default), per-case scores
+  are averaged over both display orders before win/loss/tie counting. Rankings
+  from position-biased judges can change. `detect_positional_bias=False` is
+  unchanged (round 1 only; order effect reported as not identifiable).
+- **Default tournament ratings are order-aware BTL scores on the Elo scale**
+  (`rating_method="btl"`), not sequential Elo updates. Use `rating_method="elo"`
+  for the previous computation (applied to the now order-balanced win matrix).
+  The `elo` field and sort order are kept; `_compute_elo` is unchanged.
+- `tests/test_tournament.py::test_dominant_system_ranked_first` used a mock that
+  returned `(0.9, 0.1)` for every call (a purely position-biased judge) and
+  expected the first-listed system to win. It now uses a content-aware mock.
+  New tests cover pure-position judges (ties, large order effect) and an
+  adversarial listing order.
 
 ---
 

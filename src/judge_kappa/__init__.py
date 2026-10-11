@@ -24,6 +24,7 @@ from judge_kappa.agreement import (
 from judge_kappa.bias import (
     BiasDetector,
     DifferentialItemFunctioningDetector,
+    OrderEffectEstimate,
     PositionalBiasDetector,
     PositionalBiasReport,
     VerbosityBiasDetector,
@@ -52,6 +53,7 @@ from judge_kappa.models import (
     VariantResult,
 )
 from judge_kappa.panel import EvaluationPanel, JudgeJury, JudgePanel
+from judge_kappa.ranking import BTLBootstrap, BTLFit, ComparisonGame, bootstrap_btl, fit_btl
 from judge_kappa.tournament import (
     PairResult,
     TournamentEvaluator,
@@ -80,9 +82,12 @@ __all__ = [
     "KrippendorffAlpha", "PersonFitAnalyzer",
     # Bias
     "BiasDetector", "DifferentialItemFunctioningDetector",
-    "PositionalBiasDetector", "PositionalBiasReport", "VerbosityBiasDetector",
+    "OrderEffectEstimate", "PositionalBiasDetector", "PositionalBiasReport",
+    "VerbosityBiasDetector",
     # Calibration
     "IRTJudgeWeighter",
+    # Ranking
+    "BTLBootstrap", "BTLFit", "ComparisonGame", "bootstrap_btl", "fit_btl",
     # Tournament
     "TournamentEvaluator", "TournamentReport", "TournamentStanding", "PairResult",
 ]
