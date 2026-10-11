@@ -50,7 +50,7 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: matrix.python-version == '3.12'
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
           fail_ci_if_error: false
 
   validate-configs:

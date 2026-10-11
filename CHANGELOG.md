@@ -9,6 +9,22 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Stale package name `jury-eval` / `jury_eval` removed from user-facing text:
+  CLI usage and unknown-command message, CLI and config-schema docstrings, the
+  `pip install` hints in the Anthropic and OpenAI backend `ImportError`
+  messages (they pointed users at the wrong package), and the two scripts in
+  `examples/` (`from jury_eval import ...` raised `ModuleNotFoundError`).
+- CI coverage upload: the Codecov step passed the removed input `file`; it now
+  uses `files`, so coverage reports are no longer silently skipped.
+
+### Added
+
+- Guard tests (`tests/test_naming.py`): no stale package name in shipped text,
+  every `from judge_kappa import ...` in `examples/` resolves, and CLI usage
+  names the installed command.
+
 ---
 
 ## [0.3.0] — 2026-10-11
