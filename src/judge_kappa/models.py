@@ -118,6 +118,49 @@ class DataQuality(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+class UsageSummary(BaseModel):
+    """Token and call accounting for one backend over one run."""
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    truncated: int = 0              # replies that hit the output-token limit
+    cache_hits: int = 0             # calls served from a CachedBackend (cost nothing)
+    errors: int = 0
+    latency_s: float = 0.0          # summed over calls (not wall-clock when concurrent)
+    calls_without_usage: int = 0    # replies for which the provider reported no token counts
+
+
+class BackendRecord(BaseModel):
+    """One LLM backend used in a run, as it was configured. Never contains secrets."""
+    role: str                       # "judge" | "generation"
+    label: str                      # unique within the report, e.g. "anthropic:claude-x"
+    judge_ids: list[str] = Field(default_factory=list)   # judges that used this backend
+    description: dict[str, Any] = Field(default_factory=dict)  # provider, model, max_tokens, ...
+    usage: UsageSummary | None = None                    # None if the backend tracks no usage
+
+
+class JudgeRecord(BaseModel):
+    judge_id: str
+    judge_class: str
+    temperature: float
+    on_parse_failure: str
+    n_calibration_examples: int = 0
+    backend_label: str | None = None
+
+
+class RunMetadata(BaseModel):
+    """What produced this report: enough to rerun it or explain a difference."""
+    judge_kappa_version: str
+    python_version: str
+    packages: dict[str, str] = Field(default_factory=dict)   # installed SDK / numeric libs
+    started_at: str                                          # ISO 8601, UTC
+    finished_at: str
+    duration_s: float
+    judges: list[JudgeRecord] = Field(default_factory=list)
+    backends: list[BackendRecord] = Field(default_factory=list)
+    settings: dict[str, Any] = Field(default_factory=dict)   # evaluator-level settings
+
+
 class VariantResult(BaseModel):
     variant_name: str
     output: str
@@ -191,6 +234,7 @@ class EvalReport(BaseModel):
     judge_ids: list[str]
     scale_type: ScaleType
     data_quality: DataQuality = Field(default_factory=DataQuality)
+    run: RunMetadata | None = None
 
 
 # ── Pairwise pre-recorded evaluation output ───────────────────────────────────
@@ -222,3 +266,4 @@ class PairwiseReport(BaseModel):
     label_b: str
     judge_id: str
     data_quality: DataQuality = Field(default_factory=DataQuality)
+    run: RunMetadata | None = None

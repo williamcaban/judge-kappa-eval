@@ -34,6 +34,10 @@ class JudgeJury(EvaluationPanel):
     def judge_ids(self) -> list[str]:
         return [j.judge_id for j, _ in self._jurors]
 
+    @property
+    def judges(self) -> list[LLMJudge]:
+        return [j for j, _ in self._jurors]
+
     def evaluate(self, case: EvalCase, output: str, variant_name: str) -> list[JudgeVerdict]:
         return [j.judge(case, output, variant_name) for j, _ in self._jurors]
 

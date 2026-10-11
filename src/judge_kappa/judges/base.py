@@ -118,6 +118,14 @@ class LLMJudge(ABC):
     def temperature(self) -> float:
         return self._temperature
 
+    @property
+    def on_parse_failure(self) -> str:
+        return self._on_parse_failure
+
+    @property
+    def n_calibration_examples(self) -> int:
+        return len(self._calibration)
+
     def _icl_block(self) -> str:
         """Render calibration examples as an ICL section for prompt injection."""
         if not self._calibration:

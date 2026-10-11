@@ -45,7 +45,8 @@ from typing import Literal
 
 from judge_kappa.judges.pairwise import PairwiseJudge
 from judge_kappa.llm.base import LLMBackend, call_backend
-from judge_kappa.models import DataQuality, EvalCase, Variant
+from judge_kappa.models import DataQuality, EvalCase, RunMetadata, Variant
+from judge_kappa.provenance import RunState, begin_run, end_run, generation_truncations
 from judge_kappa.quality import ReplyFlag, compute_data_quality
 from judge_kappa.ranking.btl import ELO_SCALE, ComparisonGame, bootstrap_btl, fit_btl
 
@@ -94,6 +95,7 @@ class TournamentReport:
     ci_level: float | None = None
     # Unusable judge replies (parse_failed) and truncations; see judge_kappa.quality.
     data_quality: DataQuality = field(default_factory=DataQuality)
+    run: RunMetadata | None = None   # provenance: configuration, versions and usage
 
     def print_leaderboard(self) -> None:
         has_ci = any(s.btl_ci_low is not None for s in self.standings)
@@ -269,6 +271,7 @@ class TournamentEvaluator:
         n = len(system_names)
         if n < 2:
             raise ValueError("Tournament requires at least 2 systems.")
+        run_state = begin_run(judges=[self._judge], backends=[("generation", self._gen_backend)])
 
         # Generate outputs per system per case
         outputs: dict[str, list[str]] = {name: [] for name in system_names}
@@ -280,7 +283,7 @@ class TournamentEvaluator:
                 else:
                     outputs[name].append(str(fn_or_str))
 
-        return self._run_tournament(cases, system_names, outputs)
+        return self._run_tournament(cases, system_names, outputs, run_state)
 
     def run_endpoints(
         self,
@@ -305,6 +308,13 @@ class TournamentEvaluator:
 
         system_names = [v.name for v in variants]
         outputs: dict[str, list[str]] = {v.name: [] for v in variants}
+        run_state = begin_run(
+            judges=[self._judge],
+            backends=[
+                ("generation", self._gen_backend),
+                *(("generation", v.generation_backend) for v in variants),
+            ],
+        )
 
         for case in cases:
             inputs = case.metadata.get("inputs", {"prompt": case.prompt})
@@ -326,7 +336,7 @@ class TournamentEvaluator:
                         ).text
                     )
 
-        return self._run_tournament(cases, system_names, outputs)
+        return self._run_tournament(cases, system_names, outputs, run_state)
 
     def run_dataset(
         self,
@@ -394,6 +404,7 @@ class TournamentEvaluator:
         cases: list[EvalCase],
         system_names: list[str],
         outputs: dict[str, list[str]],
+        run_state: RunState,
     ) -> TournamentReport:
         """Core: run all-pairs over all cases, compute win matrix and Elo."""
 
@@ -540,5 +551,17 @@ class TournamentEvaluator:
             order_identifiable=swap_based and btl.order_identifiable,
             possibly_separated=btl.possibly_separated,
             ci_level=self._ci_level if boot else None,
-            data_quality=compute_data_quality(replies),
+            data_quality=compute_data_quality(
+                replies, extra_truncated=generation_truncations(run_state)
+            ),
+            run=end_run(run_state, settings={
+                "mode": "tournament",
+                "n_systems": len(system_names),
+                "n_cases": n_cases,
+                "rating_method": self._rating_method,
+                "detect_positional_bias": self._detect_positional_bias,
+                "n_bootstrap": self._n_bootstrap,
+                "ci_level": self._ci_level,
+                "exclude_parse_failures": self._exclude_parse_failures,
+            }),
         )

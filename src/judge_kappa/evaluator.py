@@ -63,6 +63,7 @@ from judge_kappa.models import (
     VariantResult,
 )
 from judge_kappa.panel.base import EvaluationPanel
+from judge_kappa.provenance import begin_run, end_run, generation_truncations
 from judge_kappa.quality import ReplyFlag, compute_data_quality
 
 
@@ -306,6 +307,7 @@ class JuryEvaluator:
         at the corpus level (positional_bias_rate in the report).
         """
         results: list[PairwiseCaseResult] = []
+        run_state = begin_run(judges=[pairwise_judge])
 
         for i, row in enumerate(data):
             inputs_obj = row.get("inputs", {})
@@ -355,6 +357,10 @@ class JuryEvaluator:
             data_quality=compute_data_quality(
                 (pairwise_judge.judge_id, r.parse_error, False) for r in results
             ),
+            run=end_run(run_state, settings={
+                "mode": "pairwise_dataset", "n_cases": n,
+                "label_a": label_a, "label_b": label_b,
+            }),
         )
 
     def evaluate(
@@ -366,6 +372,15 @@ class JuryEvaluator:
         all_verdicts: list[JudgeVerdict] = []
         pos_reports:  list[PositionalBiasReport] = []
         case_results: list[CaseResult] = []
+
+        run_state = begin_run(
+            judges=[*self._panel.judges, *([self._positional_judge] if self._positional_judge else [])],
+            backends=[
+                ("generation", self._gen_backend),
+                ("generation", control.generation_backend),
+                ("generation", treatment.generation_backend),
+            ],
+        )
 
         for case in cases:
             ctrl_output = _run_variant(control,   case, self._gen_backend)
@@ -470,7 +485,21 @@ class JuryEvaluator:
             replies += [
                 (self._positional_judge.judge_id, r.parse_error, False) for r in pos_reports
             ]
-        data_quality = compute_data_quality(replies)
+        data_quality = compute_data_quality(
+            replies, extra_truncated=generation_truncations(run_state)
+        )
+        run_metadata = end_run(run_state, settings={
+            "mode": "ab_evaluation",
+            "n_cases": len(cases),
+            "scale_type": str(self._scale_type),
+            "compute_significance": self._compute_significance,
+            "compute_icc": self._compute_icc,
+            "n_bootstrap": self._n_bootstrap,
+            "verbosity_bias_threshold": self._verbosity_threshold,
+            "positional_judge": self._positional_judge.judge_id if self._positional_judge else None,
+            "control": control.name,
+            "treatment": treatment.name,
+        })
 
         uplift_vals = [r.uplift for r in case_results]
         return EvalReport(
@@ -489,4 +518,5 @@ class JuryEvaluator:
             judge_ids=self._panel.judge_ids,
             scale_type=self._scale_type,
             data_quality=data_quality,
+            run=run_metadata,
         )
