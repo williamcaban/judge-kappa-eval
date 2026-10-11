@@ -203,14 +203,37 @@ for s in report.standings:
 - **200 Elo gap ≈ 76% win rate** — decisive
 - **< 50 Elo gap** — practical tie; use more cases before claiming a ranking
 
+### How ratings are computed (v0.3)
+
+With `detect_positional_bias=True` (default) every pair is judged in both display orders.
+
+- **Win/loss/tie counts and `win_matrix`** use per-case scores averaged over the two orders (Balanced Position Calibration). A judge that always prefers the first-shown response therefore produces ties, not a win for whichever system happened to be listed first.
+- **`elo`** comes from an order-aware Bradley-Terry maximum-likelihood fit (`rating_method="btl"`, default), expressed on the Elo scale (mean 1000). It uses ordinal outcomes per game (win/tie/loss), not score margins, so the two views can differ when a judge's scores are informative but a position bonus dominates.
+- **Intervals**: `n_bootstrap=500` case-level bootstrap replicates give per-system intervals (`btl_ci_low`/`btl_ci_high`, log-odds) and an interval for the judge's **order effect**. Set `n_bootstrap=0` to disable.
+- `rating_method="elo"` restores the v0.2 sequential-Elo update on the win matrix.
+
+```python
+report = TournamentEvaluator(judge, n_bootstrap=500).run(cases, systems)
+report.print_leaderboard()          # adds a 95% CI (Elo) column and the order effect
+print(report.order_effect, report.order_effect_ci)   # log-odds; > 0 favours the first-shown response
+```
+
 ### When positional bias invalidates tournament results
 
-If any pair has `positional_bias_rate > 0.15`, that pair's preference data is unreliable. The Elo derived from it may be driven by position, not quality.
+`positional_bias_rate` (flip rate) is a coarse screen. The **order effect** is the better diagnostic: it is estimated jointly with quality, so a judge that is simply right in both orders is not penalised.
 
-Options:
-1. Switch to a different judge model for that pair
-2. Scores from both orderings are already averaged by default — check if the averaged result is still biased
-3. Exclude that pair from Elo calculation and report separately
+| Signal | Reading |
+|---|---|
+| `order_effect_ci` excludes 0 and \|effect\| > ~1 (odds ratio ~2.7x) | Judge materially favours position; prefer ratings from `detect_positional_bias=True` and report the interval |
+| `order_identifiable=False` | Pairs were judged in one order only. Ratings can be position-biased and the order effect is not reported (it is only weakly identified through intransitive cycles) |
+| `possibly_separated=True` | A system won or lost every game, or the order effect is extreme; ratings/intervals are at the regularisation bound and not reliable. Add cases or a less deterministic judge |
+
+Options when the effect is large:
+1. Switch to a different judge model, or use a panel of judges.
+2. Keep both orders (default) and report the interval, not just the point rating.
+3. Add cases: intervals narrow with the number of cases, which are the unit of resampling.
+
+Debiasing helps most for weaker judges; do not assume a frontier judge needs it. Check the estimated order effect first.
 
 ---
 

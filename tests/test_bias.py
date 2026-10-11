@@ -7,13 +7,14 @@ No real LLM calls — PairwiseJudge uses MockLLMBackend with injected responses.
 from __future__ import annotations
 
 import json
+import math
 
 import pytest
 
 from judge_kappa.bias.positional import PositionalBiasDetector, PositionalBiasReport
 from judge_kappa.bias.verbosity import VerbosityBiasDetector
 from judge_kappa.judges.pairwise import PairwiseJudge
-from judge_kappa.models import EvalCase
+from judge_kappa.models import BiasResult, EvalCase
 from tests.conftest import MockLLMBackend, make_verdict
 
 
@@ -77,6 +78,58 @@ class TestPositionalBiasDetector:
         detector = PositionalBiasDetector(PairwiseJudge("j1", backend))
         result = detector.detect(reports=reports)
         assert result.positional_bias_rate == pytest.approx(0.0)
+
+    def test_order_effect_matches_closed_form(self):
+        # Control wins 8/10 when shown first and 6/10 when shown second.
+        # Two-item MLE: b = (logit 0.8 - logit 0.6) / 2  (hand-derived reference value).
+        reports = []
+        for k in range(10):
+            r1_control_wins = k < 8
+            r2_control_wins = k < 6
+            reports.append(PositionalBiasReport(
+                f"c{k}", False, 0.0,
+                (0.9 if r1_control_wins else 0.1, 0.9 if r2_control_wins else 0.1),
+                (0.1 if r1_control_wins else 0.9, 0.1 if r2_control_wins else 0.9),
+            ))
+        est = PositionalBiasDetector.estimate_order_effect(reports, n_bootstrap=200)
+        assert est is not None
+        expected = (math.log(0.8 / 0.2) - math.log(0.6 / 0.4)) / 2.0
+        assert est.order_effect == pytest.approx(expected, abs=2e-3)
+        assert est.ci_low is not None and est.ci_high is not None
+        assert est.ci_low < est.order_effect < est.ci_high
+        assert est.n_cases == 10
+
+    def test_order_effect_separates_quality_from_position(self):
+        # Treatment is better and wins in both rounds: zero flips, and no order effect.
+        content_driven = [
+            PositionalBiasReport(f"c{k}", False, 0.0, (0.2, 0.2), (0.8, 0.8)) for k in range(6)
+        ]
+        # First-shown always wins: every case flips, order effect is strongly positive.
+        positional = [
+            PositionalBiasReport(f"c{k}", True, 0.0, (0.9, 0.1), (0.1, 0.9)) for k in range(6)
+        ]
+        backend = MockLLMBackend()
+        detector = PositionalBiasDetector(PairwiseJudge("j1", backend))
+        a = detector.detect(reports=content_driven)
+        b = detector.detect(reports=positional)
+        assert a.positional_bias_rate == 0.0
+        assert a.order_effect is not None and abs(a.order_effect) < 0.05
+        assert b.positional_bias_rate == 1.0
+        assert b.order_effect is not None and b.order_effect > 3.0
+
+    def test_order_effect_edge_cases(self):
+        assert PositionalBiasDetector.estimate_order_effect([]) is None
+        one = PositionalBiasDetector.estimate_order_effect(
+            [PositionalBiasReport("c1", True, 0.0, (0.9, 0.1), (0.1, 0.9))]
+        )
+        assert one is not None and one.ci_low is None and one.ci_high is None
+        empty = PositionalBiasDetector(PairwiseJudge("j1", MockLLMBackend())).detect(reports=[])
+        assert empty.order_effect is None and empty.positional_bias_rate == 0.0
+
+    def test_bias_result_new_fields_default_to_none(self):
+        r = BiasResult()
+        assert r.order_effect is None
+        assert r.order_effect_ci_low is None and r.order_effect_ci_high is None
 
     def test_score_instability_computed(self):
         backend = MockLLMBackend(responses=[

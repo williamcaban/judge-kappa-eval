@@ -42,6 +42,30 @@ def _judge(responses: list[str]) -> PairwiseJudge:
     return PairwiseJudge("j1", MockLLMBackend(responses=responses * 200))
 
 
+class _QualityBackend:
+    """Content-aware mock: scores each output from a quality table.
+
+    ``first_bonus`` is added to whichever output is displayed first, which models
+    a judge with a genuine position bias on top of real quality sensitivity.
+    """
+
+    def __init__(self, quality: dict[str, float], first_bonus: float = 0.0) -> None:
+        self._quality = quality
+        self._bonus = first_bonus
+
+    def complete(self, system: str, user: str, temperature: float = 0.0) -> str:  # noqa: ARG002
+        a = user.split("## Output A\n", 1)[1].split("\n\n## Output B\n", 1)[0]
+        b = user.split("\n\n## Output B\n", 1)[1]
+        return _pairwise_resp(
+            min(1.0, self._quality[a] + self._bonus),
+            min(1.0, self._quality[b]),
+        )
+
+
+def _quality_judge(quality: dict[str, float], first_bonus: float = 0.0) -> PairwiseJudge:
+    return PairwiseJudge("jq", _QualityBackend(quality, first_bonus))  # type: ignore[arg-type]
+
+
 # ── _compute_elo ──────────────────────────────────────────────────────────────
 
 
@@ -145,15 +169,16 @@ class TestTournamentRun:
         assert abs(rate_xy + rate_yx - 1.0) < 0.01  # sum to 1 (ignoring ties)
 
     def test_dominant_system_ranked_first(self):
-        cases = _cases(4)
-        # A always beats everyone (score 0.9 vs 0.1)
-        responses = [_pairwise_resp(0.9, 0.1)] * 200
-        tournament = self._tournament(responses)
+        # A is genuinely best: a content-aware judge scores it highest in either position.
+        tournament = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.5, "c": 0.1}),
+            detect_positional_bias=True,
+        )
         report = tournament.run(
-            cases=cases,
+            cases=_cases(4),
             systems={"A": lambda _: "a", "B": lambda _: "b", "C": lambda _: "c"},
         )
-        assert report.standings[0].system == "A"
+        assert [s.system for s in report.standings] == ["A", "B", "C"]
 
     def test_fewer_than_two_systems_raises(self):
         tournament = self._tournament([_pairwise_resp(0.5, 0.5)])
@@ -264,6 +289,140 @@ class TestTournamentPositionalBias:
         )
         for pair in report.pair_results:
             assert pair.positional_bias_rate == 0.0
+
+
+# ── Order-aware ratings (BTL) ─────────────────────────────────────────────────
+
+
+class TestOrderAwareRatings:
+    def test_pure_position_judge_produces_ties_not_a_ranking(self):
+        # The judge always prefers whatever is shown first, whatever the content.
+        # Round-1-only scoring would crown whichever system was listed first.
+        responses = [_pairwise_resp(0.9, 0.1)] * 200
+        report = TournamentEvaluator(
+            pairwise_judge=_judge(responses),
+            detect_positional_bias=True,
+            n_bootstrap=0,
+        ).run(
+            cases=_cases(6),
+            systems={"A": lambda _: "a", "B": lambda _: "b", "C": lambda _: "c"},
+        )
+        for s in report.standings:
+            assert s.wins == 0 and s.losses == 0
+            assert s.ties == 6 * 2          # two opponents x six cases
+        spread = max(s.elo for s in report.standings) - min(s.elo for s in report.standings)
+        assert spread < 1.0
+        assert report.order_identifiable
+        assert report.order_effect is not None and report.order_effect > 3.0
+        assert report.possibly_separated
+
+    def test_ranking_recovered_when_listing_order_is_adversarial(self):
+        # first_bonus 0.35 exceeds the 0.30 gap between adjacent systems, so adjacent
+        # pairs are decided by position; only a-vs-c is decided by quality.
+        # Listed as c, b, a, round-1-only scoring yields a three-way cycle.
+        report = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.6, "c": 0.3}, first_bonus=0.35),
+            detect_positional_bias=True,
+            n_bootstrap=0,
+        ).run(
+            cases=_cases(5),
+            systems={"C": lambda _: "c", "B": lambda _: "b", "A": lambda _: "a"},
+        )
+        assert [s.system for s in report.standings] == ["A", "B", "C"]
+        assert report.order_effect is not None and report.order_effect > 0.0
+
+    def test_bootstrap_intervals_present_and_bracket_scores(self):
+        report = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.5, "c": 0.1}, first_bonus=0.1),
+            n_bootstrap=100,
+            bootstrap_seed=1,
+        ).run(
+            cases=_cases(6),
+            systems={"A": lambda _: "a", "B": lambda _: "b", "C": lambda _: "c"},
+        )
+        assert report.ci_level == 0.95
+        for s in report.standings:
+            assert s.btl_ci_low is not None and s.btl_ci_high is not None
+            assert s.btl_score is not None
+            assert s.btl_ci_low <= s.btl_score <= s.btl_ci_high
+        assert report.order_effect_ci is not None
+
+    def test_intervals_disabled_when_n_bootstrap_zero(self):
+        report = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.1}),
+            n_bootstrap=0,
+        ).run(cases=_cases(3), systems={"A": lambda _: "a", "B": lambda _: "b"})
+        assert report.ci_level is None
+        assert report.order_effect_ci is None
+        assert all(s.btl_ci_low is None for s in report.standings)
+
+    def test_single_case_skips_bootstrap_without_error(self):
+        report = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.1}),
+            n_bootstrap=50,
+        ).run(cases=_cases(1), systems={"A": lambda _: "a", "B": lambda _: "b"})
+        assert report.ci_level is None
+
+    def test_order_effect_not_identifiable_without_swaps(self):
+        report = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.1}),
+            detect_positional_bias=False,
+            n_bootstrap=0,
+        ).run(cases=_cases(4), systems={"A": lambda _: "a", "B": lambda _: "b"})
+        assert not report.order_identifiable
+        assert report.order_effect is None
+
+    def test_no_swaps_never_reports_cycle_identified_order_effect(self):
+        # Three systems, one display order: the order effect is mathematically
+        # identified through the 0-1-2 cycle, but only via transitivity, so the
+        # tournament report must not present it as an estimate.
+        report = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.6, "c": 0.3}, first_bonus=0.35),
+            detect_positional_bias=False,
+            n_bootstrap=20,
+        ).run(
+            cases=_cases(6),
+            systems={"C": lambda _: "c", "B": lambda _: "b", "A": lambda _: "a"},
+        )
+        assert report.order_effect is None
+        assert report.order_effect_ci is None
+        assert not report.order_identifiable
+
+    def test_elo_method_reproduces_legacy_ratings(self):
+        report = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.5, "c": 0.1}),
+            rating_method="elo",
+            n_bootstrap=0,
+        ).run(
+            cases=_cases(4),
+            systems={"A": lambda _: "a", "B": lambda _: "b", "C": lambda _: "c"},
+        )
+        legacy = _compute_elo(report.win_matrix, ["A", "B", "C"])
+        for s in report.standings:
+            assert s.elo == pytest.approx(legacy[s.system], abs=0.06)
+        assert report.rating_method == "elo"
+
+    def test_constructor_validation(self):
+        judge = _judge([_pairwise_resp(0.6, 0.4)])
+        with pytest.raises(ValueError, match="rating_method"):
+            TournamentEvaluator(judge, rating_method="glicko")  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="n_bootstrap"):
+            TournamentEvaluator(judge, n_bootstrap=1)
+        with pytest.raises(ValueError, match="ci_level"):
+            TournamentEvaluator(judge, ci_level=1.0)
+
+    def test_leaderboard_shows_interval_and_order_effect(self, capsys):
+        report = TournamentEvaluator(
+            pairwise_judge=_quality_judge({"a": 0.9, "b": 0.6, "c": 0.3}, first_bonus=0.35),
+            n_bootstrap=50,
+        ).run(
+            cases=_cases(5),
+            systems={"A": lambda _: "a", "B": lambda _: "b", "C": lambda _: "c"},
+        )
+        report.print_leaderboard()
+        out = capsys.readouterr().out
+        assert "95% CI (Elo)" in out
+        assert "Judge order effect" in out
 
 
 # ── run_endpoints() ───────────────────────────────────────────────────────────

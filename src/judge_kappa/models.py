@@ -126,6 +126,11 @@ class JudgeFitResult(BaseModel):
 
 class BiasResult(BaseModel):
     positional_bias_rate: float = 0.0          # fraction of cases with position flip
+    # Order-aware BTL estimate of the judge's display-order effect (log-odds; > 0 favours
+    # the first-shown response). None when no positional reports were available.
+    order_effect: float | None = None
+    order_effect_ci_low: float | None = None   # bootstrap interval; None for a single case
+    order_effect_ci_high: float | None = None
     verbosity_bias_rho: float | None = None  # Spearman ρ(length, score)
     verbosity_bias_p: float | None = None
     verbosity_biased: bool = False
