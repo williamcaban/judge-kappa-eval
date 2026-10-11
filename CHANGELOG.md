@@ -16,8 +16,10 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `pip install` hints in the Anthropic and OpenAI backend `ImportError`
   messages (they pointed users at the wrong package), and the two scripts in
   `examples/` (`from jury_eval import ...` raised `ModuleNotFoundError`).
-- CI coverage upload: the Codecov step passed the removed input `file`; it now
-  uses `files`, so coverage reports are no longer silently skipped.
+- CI coverage upload: the Codecov step passed the removed input `file`, so the
+  uploader never ran; it now uses `files` and reads `CODECOV_TOKEN`. Uploads are
+  still rejected until that repository secret is set (`fail_ci_if_error: false`
+  keeps CI green; the rejection is visible in the step log).
 
 ### Added
 
