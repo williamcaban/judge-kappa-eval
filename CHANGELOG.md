@@ -9,12 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Security
+---
 
-- CI hardening: dependency audit (`pip-audit`, PR/push/weekly), Dependabot for
-  Actions and Python, Actions pinned to commit SHAs with read-only token
-  permissions, commit-hygiene check, TestPyPI gate before PyPI releases,
-  committed `uv.lock`, and a `SECURITY.md` policy.
+## [0.3.0] — 2026-10-11
 
 ### Added
 
@@ -83,6 +80,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   expected the first-listed system to win. It now uses a content-aware mock.
   New tests cover pure-position judges (ties, large order effect) and an
   adversarial listing order.
+
+### Security
+
+- CI hardening: dependency audit (`pip-audit`, PR/push/weekly), Dependabot for
+  Actions and Python, Actions pinned to commit SHAs with read-only token
+  permissions, commit-hygiene check, TestPyPI gate before PyPI releases,
+  committed `uv.lock`, and a `SECURITY.md` policy.
 
 ---
 
@@ -227,7 +231,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 8 test modules, 60+ tests, zero real LLM calls (MockLLMBackend)
 - Coverage: models, adapters, judges (scoring math, ICL, malformed JSON), panels, agreement metrics, bias detectors, evaluator integration, CLI schema validation, key resolution
 
-[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/williamcaban/judge-kappa-eval/releases/tag/v0.1.0
