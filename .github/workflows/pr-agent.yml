@@ -1,0 +1,30 @@
+# AI review via the shared workflow in interplay-adversarial/.github (secret MAAS_API_KEY)
+name: PR Agent
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  pr_agent:
+    # Same-repo, non-bot PRs; slash commands only from owner/members/collaborators.
+    if: >-
+      github.event.sender.type != 'Bot' && (
+        (github.event_name == 'pull_request'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && !github.event.pull_request.draft) ||
+        (github.event_name == 'issue_comment'
+          && github.event.issue.pull_request
+          && startsWith(github.event.comment.body, '/')
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+      )
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+    uses: interplay-adversarial/.github/.github/workflows/pr-agent.yml@9763e10fc90ccf55847ef198eb835b51864f68f4   # shared workflow, bumped by Dependabot
+    secrets:
+      MAAS_API_KEY: ${{ secrets.MAAS_API_KEY }}
