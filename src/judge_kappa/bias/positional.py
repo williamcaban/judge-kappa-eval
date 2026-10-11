@@ -38,6 +38,7 @@ class PositionalBiasReport:
     score_instability: float
     control_scores: tuple[float, float]   # (round1, round2)
     treatment_scores: tuple[float, float]
+    parse_error: str | None = None        # first unusable-reply code in either round, if any
 
 
 @dataclass
@@ -124,6 +125,7 @@ class PositionalBiasDetector(BiasDetector):
             score_instability=round(instability, 4),
             control_scores=(va_r1.score, vb_r2.score),
             treatment_scores=(vb_r1.score, va_r2.score),
+            parse_error=va_r1.parse_error or va_r2.parse_error,
         )
 
     def detect(self, **kwargs: Any) -> BiasResult:

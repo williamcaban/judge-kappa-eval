@@ -101,13 +101,43 @@ class RankJudge(LLMJudge):
         system = _SYSTEM.format(icl_block=self._icl_block())
         user = f"## Prompt\n{case.prompt}\n\n{outputs_section}"
 
-        parsed = self._parse_json(self._call(system, user))
-        rankings_raw = parsed.get("rankings") or {}
-        raw_rankings: dict[str, int] = {k: int(v) for k, v in rankings_raw.items()}
+        n = len(names)
+
+        def _validate_rankings(data: dict[str, Any]) -> str | None:
+            ranks = data["rankings"]
+            if not isinstance(ranks, dict):
+                return "rankings_not_an_object"
+            missing = [lab for lab in labels if lab not in ranks]
+            if missing:
+                return f"missing_rankings:{len(missing)}/{n}"
+            vals = [ranks[lab] for lab in labels]
+            if any(
+                isinstance(v, bool)
+                or not isinstance(v, int | float)
+                or (isinstance(v, float) and not v.is_integer())
+                for v in vals
+            ):
+                return "non_integer_rank"
+            if sorted(int(v) for v in vals) != list(range(1, n + 1)):
+                return "invalid_ranks"
+            return None
+
+        reply = self._parse_reply(
+            self._call_full(system, user), case.id,
+            required=("rankings",), validate=_validate_rankings,
+        )
+        parsed = reply.data
+        rankings_raw = parsed.get("rankings")
+        raw_rankings: dict[str, int] = {}
+        if isinstance(rankings_raw, dict):
+            for k, v in rankings_raw.items():
+                try:
+                    raw_rankings[str(k)] = int(v)
+                except (TypeError, ValueError):
+                    continue   # flagged by _validate_rankings; falls back to worst rank below
         rationale: str = str(parsed.get("rationale", parsed.get("_raw", "")))
 
         # Normalise: rank 1 → score 1.0, rank N → score 0.0
-        n = len(names)
         verdicts: dict[str, JudgeVerdict] = {}
         for label, name in label_to_name.items():
             rank = int(raw_rankings.get(label, n))
@@ -120,5 +150,8 @@ class RankJudge(LLMJudge):
                 score=round(score, 4),
                 rationale=rationale,
                 output_token_count=len(system_outputs[name].split()),
+                parse_failed=reply.failed,
+                parse_error=reply.error,
+                truncated=reply.response.truncated,
             )
         return verdicts

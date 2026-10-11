@@ -10,7 +10,7 @@ from __future__ import annotations
 import textwrap
 from typing import Any
 
-from judge_kappa.judges.base import LLMJudge
+from judge_kappa.judges.base import LLMJudge, numeric_scores, validate_score_map
 from judge_kappa.models import EvalCase, JudgeVerdict, RubricDimension
 
 _SYSTEM = textwrap.dedent("""\
@@ -48,8 +48,15 @@ class RubricJudge(LLMJudge):
             + (f"\n\n## Reference / Expected Output\n{case.expected_output}"
                if case.expected_output else "")
         )
-        parsed = self._parse_json(self._call(system, user))
-        d_scores: dict[str, float] = parsed.get("dimension_scores", {})
+        expected = [d.name for d in self._rubric]
+        reply = self._parse_reply(
+            self._call_full(system, user),
+            case.id,
+            required=("dimension_scores",),
+            validate=lambda d: validate_score_map(d["dimension_scores"], expected, "dimension"),
+        )
+        parsed = reply.data
+        d_scores = numeric_scores(parsed.get("dimension_scores"))
 
         total_weight = sum(d.weight for d in self._rubric)
         score = (
@@ -63,7 +70,10 @@ class RubricJudge(LLMJudge):
             eval_case_id=case.id,
             variant_name=variant_name,
             score=round(score, 4),
-            rationale=parsed.get("rationale", parsed.get("_raw", "")),
+            rationale=str(parsed.get("rationale", parsed.get("_raw", ""))),
             dimension_scores=d_scores,
             output_token_count=len(output.split()),
+            parse_failed=reply.failed,
+            parse_error=reply.error,
+            truncated=reply.response.truncated,
         )

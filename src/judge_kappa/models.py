@@ -95,6 +95,27 @@ class JudgeVerdict(BaseModel):
     assertion_scores: dict[str, float] = Field(default_factory=dict)
     dimension_scores: dict[str, float] = Field(default_factory=dict)
     output_token_count: int = 0
+    # True when the judge reply was not usable JSON or did not match the expected schema.
+    # `score` then holds the historical fallback value (0.0 for assertion/rubric, 0.5 for
+    # pairwise, worst rank for ranking) and must not be read as a real judgement.
+    parse_failed: bool = False
+    parse_error: str | None = None    # short code, e.g. "invalid_json", "missing_assertions:1/3"
+    truncated: bool = False           # reply hit the output-token limit
+
+
+class DataQuality(BaseModel):
+    """How much of a run's judge output was actually usable.
+
+    Fallback scores from unusable replies are still included in the aggregate metrics;
+    this block tells you how many there were so you can decide whether to trust them.
+    """
+    n_judge_calls: int = 0
+    n_parse_failures: int = 0
+    parse_failure_rate: float = 0.0
+    parse_failures_by_judge: dict[str, int] = Field(default_factory=dict)
+    parse_errors: dict[str, int] = Field(default_factory=dict)   # error code → count
+    n_truncated_replies: int = 0
+    warnings: list[str] = Field(default_factory=list)
 
 
 class VariantResult(BaseModel):
@@ -169,6 +190,7 @@ class EvalReport(BaseModel):
     bias: BiasResult
     judge_ids: list[str]
     scale_type: ScaleType
+    data_quality: DataQuality = Field(default_factory=DataQuality)
 
 
 # ── Pairwise pre-recorded evaluation output ───────────────────────────────────
@@ -185,6 +207,8 @@ class PairwiseCaseResult(BaseModel):
     score_b: float
     preferred: str     # "A", "B", or "tie"
     rationale: str
+    parse_failed: bool = False       # judge reply unusable; scores are the 0.5/0.5 fallback
+    parse_error: str | None = None
 
 
 class PairwiseReport(BaseModel):
@@ -197,3 +221,4 @@ class PairwiseReport(BaseModel):
     label_a: str
     label_b: str
     judge_id: str
+    data_quality: DataQuality = Field(default_factory=DataQuality)

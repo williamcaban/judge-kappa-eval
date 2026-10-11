@@ -63,6 +63,7 @@ from judge_kappa.models import (
     VariantResult,
 )
 from judge_kappa.panel.base import EvaluationPanel
+from judge_kappa.quality import ReplyFlag, compute_data_quality
 
 
 def _mcnemar_and_ci(
@@ -332,6 +333,8 @@ class JuryEvaluator:
                 score_b=vb.score,
                 preferred=preferred,
                 rationale=va.rationale,
+                parse_failed=va.parse_failed,
+                parse_error=va.parse_error,
             ))
 
         n = len(results)
@@ -349,6 +352,9 @@ class JuryEvaluator:
             label_a=label_a,
             label_b=label_b,
             judge_id=pairwise_judge.judge_id,
+            data_quality=compute_data_quality(
+                (pairwise_judge.judge_id, r.parse_error, False) for r in results
+            ),
         )
 
     def evaluate(
@@ -459,6 +465,13 @@ class JuryEvaluator:
             else []
         )
 
+        replies: list[ReplyFlag] = [(v.judge_id, v.parse_error, v.truncated) for v in all_verdicts]
+        if self._positional_judge is not None:
+            replies += [
+                (self._positional_judge.judge_id, r.parse_error, False) for r in pos_reports
+            ]
+        data_quality = compute_data_quality(replies)
+
         uplift_vals = [r.uplift for r in case_results]
         return EvalReport(
             cases=case_results,
@@ -475,4 +488,5 @@ class JuryEvaluator:
             bias=corpus_bias,
             judge_ids=self._panel.judge_ids,
             scale_type=self._scale_type,
+            data_quality=data_quality,
         )
