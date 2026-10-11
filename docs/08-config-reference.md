@@ -97,6 +97,7 @@ panel:
         api_key_env: "..."     # optional — see docs/05-key-management.md
       weight: 1.0              # optional — used by jury; panel uses equal weights
       temperature: 0.0         # optional
+      on_parse_failure: flag   # optional — flag (default) | raise; see docs/12
       calibration:             # optional — ICL anchors for score grounding
         - prompt: "..."
           output: "..."

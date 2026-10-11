@@ -108,6 +108,9 @@ class JudgeConfig(BaseModel):
     backend: BackendConfig
     weight: float = 1.0                   # used by JudgeJury; ignored by JudgePanel
     temperature: float = 0.0
+    on_parse_failure: Literal["flag", "raise"] = "flag"
+    # flag  → keep the historical fallback score, mark the verdict, count it in data_quality
+    # raise → stop the run with JudgeParseError on the first unusable reply
     calibration: list[CalibrationConfig] = Field(default_factory=list)
     rubric: list[RubricDimensionConfig] = Field(default_factory=list)
 
@@ -145,6 +148,7 @@ class PositionalJudgeConfig(BaseModel):
     id: str
     backend: BackendConfig
     temperature: float = 0.0
+    on_parse_failure: Literal["flag", "raise"] = "flag"
     calibration: list[CalibrationConfig] = Field(default_factory=list)
 
 

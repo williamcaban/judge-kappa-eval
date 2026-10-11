@@ -83,6 +83,9 @@ raises `JudgeParseError` (with `judge_id`, `case_id`, `error`) so a pipeline can
 judge = AssertionJudge("j1", backend, on_parse_failure="raise")
 ```
 
+In YAML, set `on_parse_failure: raise` on a judge (or on `positional_judge` / `pairwise_judge`).
+The CLI then stops with a one-line error naming the judge and case instead of a traceback.
+
 **Tournaments.** `TournamentEvaluator(exclude_parse_failures=True)` drops unusable rounds
 instead of rating them as 0.5/0.5 ties. A system left with no usable game cannot be rated and
 is named in the error. `TournamentReport.data_quality` is always populated and printed by
@@ -122,6 +125,10 @@ or in YAML: `backend.cache_path: runs/judge-cache.jsonl`.
   are not part of it. Use `namespace=` to separate runs that must not share replies.
 - Failures are never cached. A line cut short by a crash is skipped on load.
 - Cache hits count as calls but not as tokens, so usage totals reflect what was billed.
+- A cache hit keeps the reply's truncation flag, so a resumed run reports the same
+  `n_truncated_replies` as the original.
+- Wrapping a custom backend that has no `describe()` requires `namespace=`; otherwise two
+  different backends of the same class could be served each other's replies from a shared file.
 - **The file contains your prompts and the model replies in plain text** (created `0600`).
   Keep it out of version control.
 

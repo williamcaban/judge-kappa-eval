@@ -82,8 +82,11 @@ class UsageStats:
             self._calls += 1
             if resp.cached:
                 # A cache hit costs nothing: count the call and the hit, not tokens or latency,
-                # so token totals reflect what was actually billed.
+                # so token totals reflect what was actually billed. Truncation is a property
+                # of the reply, not of billing, so a resumed run still reports it.
                 self._cache_hits += 1
+                if resp.truncated:
+                    self._truncated += 1
                 return
             if resp.truncated:
                 self._truncated += 1

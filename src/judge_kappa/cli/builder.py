@@ -124,11 +124,13 @@ def _build_judge(cfg: JudgeConfig) -> LLMJudge:
         return RubricJudge(
             judge_id=cfg.id, backend=backend,
             calibration_examples=cal, temperature=cfg.temperature,
+            on_parse_failure=cfg.on_parse_failure,
             rubric=_build_rubric(cfg.rubric),
         )
     return AssertionJudge(
         judge_id=cfg.id, backend=backend,
         calibration_examples=cal, temperature=cfg.temperature,
+        on_parse_failure=cfg.on_parse_failure,
     )
 
 
@@ -148,6 +150,7 @@ def _build_positional_judge(cfg: PositionalJudgeConfig) -> PairwiseJudge:
     return PairwiseJudge(
         judge_id=cfg.id, backend=backend,
         calibration_examples=cal, temperature=cfg.temperature,
+        on_parse_failure=cfg.on_parse_failure,
     )
 
 

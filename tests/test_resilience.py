@@ -195,19 +195,48 @@ class TestCachedBackend:
         assert d["cached"] is True and d["cache_file"] == "c.jsonl"
         assert "secret-dir" not in json.dumps(d)
 
-    def test_wraps_a_plain_backend(self, tmp_path: Path):
+    def test_a_plain_backend_needs_an_explicit_namespace(self, tmp_path: Path):
+        # Two different backends of the same class would otherwise share keys and be
+        # served each other's replies from a shared cache file.
         class _Plain:
-            def __init__(self) -> None:
-                self.n = 0
+            def __init__(self, tag: str) -> None:
+                self.tag, self.n = tag, 0
 
             def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
                 self.n += 1
-                return "plain"
+                return f"plain-{self.tag}"
 
-        inner = _Plain()
+        with pytest.raises(ValueError, match="namespace"):
+            CachedBackend(_Plain("a"), tmp_path / "c.jsonl")
+
+        path = tmp_path / "c.jsonl"
+        a, b = _Plain("a"), _Plain("b")
+        ca = CachedBackend(a, path, namespace="a")
+        cb = CachedBackend(b, path, namespace="b")
+        assert ca.complete("s", "u") == "plain-a"
+        assert cb.complete("s", "u") == "plain-b"        # not a's cached reply
+        assert ca.complete("s", "u") == "plain-a" and a.n == 1
+
+    def test_integer_and_float_temperature_share_a_key(self, tmp_path: Path):
+        inner = _Counting()
         c = CachedBackend(inner, tmp_path / "c.jsonl")
-        assert c.complete("s", "u") == "plain" and c.complete("s", "u") == "plain"
-        assert inner.n == 1
+        c.complete("s", "u", 0)           # type: ignore[arg-type]
+        c.complete("s", "u", 0.0)
+        assert inner.calls == 1
+
+    def test_cache_hits_keep_the_truncation_signal(self, tmp_path: Path):
+        class _Cut(_Counting):
+            def complete_with_usage(self, system, user, temperature=0.0):
+                self.calls += 1
+                return LLMResponse(text="cut", finish_reason="length", output_tokens=9)
+
+        path = tmp_path / "c.jsonl"
+        CachedBackend(_Cut(), path).complete("s", "u")
+        again = CachedBackend(_Cut(), path)
+        resp = again.complete_with_usage("s", "u")
+        assert resp.cached and resp.truncated
+        snap = again.stats.snapshot()
+        assert snap.cache_hits == 1 and snap.truncated == 1 and snap.output_tokens == 0
 
 
 # ── Content-aware, deterministic mocks ──────────────────────────────────────────
@@ -221,6 +250,9 @@ class _PairQuality:
         self._fail_on_call = fail_on_call
         self.calls = 0
         self._lock = threading.Lock()
+
+    def describe(self) -> dict[str, Any]:
+        return {"provider": "mock", "model": "pair-quality"}
 
     def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
         with self._lock:
@@ -327,6 +359,9 @@ class _Det:
     def __init__(self) -> None:
         self.calls = 0
         self._lock = threading.Lock()
+
+    def describe(self) -> dict[str, Any]:
+        return {"provider": "mock", "model": "det"}
 
     def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
         with self._lock:
@@ -446,6 +481,9 @@ class TestConfigAndBuilder:
         class _Fake:
             def __init__(self, **kw: Any) -> None:
                 self.kw = kw
+
+            def describe(self) -> dict[str, Any]:
+                return {"provider": "fake", "model": "m"}
 
             def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
                 return "x"

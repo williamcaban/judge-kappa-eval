@@ -190,7 +190,7 @@ class LLMJudge(ABC):
 
         if error is not None:
             excerpt = resp.text[:120]
-            self._unusable_replies += 1
+            self._unusable_replies = getattr(self, "_unusable_replies", 0) + 1
             # Log the first few per judge; the report's data_quality carries the totals.
             level = logging.WARNING if self._unusable_replies <= _MAX_WARNED_REPLIES else logging.DEBUG
             logger.log(

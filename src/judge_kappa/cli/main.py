@@ -20,6 +20,7 @@ import yaml
 
 from judge_kappa.cli.builder import build_evaluator, load_dataset
 from judge_kappa.cli.config_schema import DatasetModeConfig, PairwiseModeConfig, SkillModeConfig
+from judge_kappa.judges.base import JudgeParseError
 from judge_kappa.models import DataQuality, EvalReport, RunMetadata
 
 
@@ -119,7 +120,8 @@ def cmd_run(config_path: str, output_file: str | None, fmt: str, include_verdict
         backend = _build_backend(config.pairwise_judge.backend)
         cal = _build_calibration(config.pairwise_judge.calibration)
         pj = PairwiseJudge(config.pairwise_judge.id, backend, calibration_examples=cal,
-                           temperature=config.pairwise_judge.temperature)
+                           temperature=config.pairwise_judge.temperature,
+                           on_parse_failure=config.pairwise_judge.on_parse_failure)
         gen_backend = _build_backend(config.generation.backend)
         # JudgePanel with a single assertion judge as a placeholder — pairwise mode
         # never calls panel.evaluate(); it calls evaluate_pairwise_dataset() directly.
@@ -268,7 +270,14 @@ def app() -> None:
         if fmt not in ("json", "text", "jsonl"):
             _die(f"--format must be json, text, or jsonl. Got: {fmt!r}")
 
-        cmd_run(config_path, output_file, fmt, include_verdicts)
+        try:
+            cmd_run(config_path, output_file, fmt, include_verdicts)
+        except JudgeParseError as exc:
+            _die(
+                f"{exc}\n"
+                "Set `on_parse_failure: flag` on the judge to keep going and count "
+                "unusable replies in the report's data_quality instead."
+            )
 
     else:
         _die(f"Unknown command: {cmd!r}. Run 'judge-kappa --help'.")

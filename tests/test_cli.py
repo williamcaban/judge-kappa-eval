@@ -199,6 +199,63 @@ class TestCLIHelpAndErrors:
 # ── Backend request parameters (config → builder → backend) ───────────────────
 
 
+class TestParseFailurePolicy:
+    def test_default_is_flag_and_values_are_validated(self):
+        from pydantic import ValidationError
+
+        from judge_kappa.cli.config_schema import BackendConfig, JudgeConfig, PositionalJudgeConfig
+
+        backend = BackendConfig(provider="openai", model="m")
+        assert JudgeConfig(id="j", type="assertion", backend=backend).on_parse_failure == "flag"
+        assert PositionalJudgeConfig(id="p", backend=backend).on_parse_failure == "flag"
+        with pytest.raises(ValidationError):
+            JudgeConfig(id="j", type="assertion", backend=backend, on_parse_failure="ignore")
+
+    def test_builder_passes_the_policy_to_the_judge(self, monkeypatch):
+        from judge_kappa.cli import builder
+        from judge_kappa.cli.config_schema import BackendConfig, JudgeConfig, RubricDimensionConfig
+
+        class _Backend:
+            def complete(self, system, user, temperature=0.0):
+                return "{}"
+
+        monkeypatch.setattr(builder, "_build_backend", lambda cfg: _Backend())
+        backend = BackendConfig(provider="openai", model="m")
+        a = builder._build_judge(JudgeConfig(id="a", type="assertion", backend=backend, on_parse_failure="raise"))
+        r = builder._build_judge(JudgeConfig(
+            id="r", type="rubric", backend=backend, on_parse_failure="raise",
+            rubric=[RubricDimensionConfig(name="d", description="d")],
+        ))
+        assert a.on_parse_failure == "raise" and r.on_parse_failure == "raise"
+
+    def test_cli_reports_a_parse_failure_cleanly_instead_of_a_traceback(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        from judge_kappa.cli import main as cli_main
+        from judge_kappa.judges.base import JudgeParseError
+
+        class _Evaluator:
+            def evaluate_dataset(self, **_kw):
+                raise JudgeParseError("j1", "case-7", "invalid_json", "I think so")
+
+        monkeypatch.setattr(cli_main, "build_evaluator", lambda _cfg: _Evaluator())
+        monkeypatch.setattr(cli_main, "load_dataset", lambda _p: [{"id": "c"}])
+        cfg = {
+            "mode": "dataset", "dataset_file": "d.jsonl",
+            "generation": {"backend": {"provider": "openai", "model": "m", "api_key_env": ""}},
+            "panel": {"judges": [{"id": "j1", "type": "assertion",
+                                  "backend": {"provider": "openai", "model": "m", "api_key_env": ""}}]},
+            "control": {"name": "control"}, "treatment": {"name": "treatment"},
+        }
+        path = tmp_path / "c.yaml"
+        path.write_text(yaml.dump(cfg))
+        with patch("sys.argv", ["judge-kappa", "run", str(path)]), pytest.raises(SystemExit) as exc:
+            cli_main.app()
+        assert exc.value.code != 0
+        err = capsys.readouterr().err
+        assert "case-7" in err and "invalid_json" in err and "on_parse_failure: flag" in err
+
+
 class TestBackendRequestParameters:
     def test_defaults_are_unset(self):
         from judge_kappa.cli.config_schema import BackendConfig

@@ -31,7 +31,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   reproducible.
 - **`max_workers`** on `JuryEvaluator`, `TournamentEvaluator`, `evaluate_pairwise_dataset`
   and YAML configs. Default 1 (sequential, no threads); results are identical for any value.
-- CLI text report prints data-quality warnings and a usage line.
+- CLI text report prints data-quality warnings and a usage line. YAML judges accept
+  `on_parse_failure: flag | raise`; a `raise` stops the CLI with a one-line error.
 - `docs/12-reliability-and-reproducibility.md` and `examples/demo_reliability_controls.py`.
 
 ### Changed

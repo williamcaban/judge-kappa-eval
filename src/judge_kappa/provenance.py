@@ -35,6 +35,14 @@ def _version(dist: str) -> str | None:
         return None
 
 
+def _as_float(value: object, default: float = 0.0) -> float:
+    return float(value) if isinstance(value, int | float) and not isinstance(value, bool) else default
+
+
+def _as_int(value: object, default: int = 0) -> int:
+    return int(value) if isinstance(value, int) and not isinstance(value, bool) else default
+
+
 @dataclass
 class _Track:
     backend: object
@@ -76,7 +84,9 @@ def begin_run(
             track.judge_ids.append(judge_id)
 
     for judge in judges:
-        _add("judge", judge.backend, judge.judge_id)
+        backend = getattr(judge, "backend", None)    # custom judges may not expose it
+        if backend is not None:
+            _add("judge", backend, getattr(judge, "judge_id", None))
     for role, backend in backends:
         if backend is not None:
             _add(role, backend, None)
@@ -131,12 +141,12 @@ def end_run(state: RunState, settings: dict[str, Any] | None = None) -> RunMetad
 
     judge_records = [
         JudgeRecord(
-            judge_id=j.judge_id,
+            judge_id=str(getattr(j, "judge_id", type(j).__name__)),
             judge_class=type(j).__name__,
-            temperature=j.temperature,
-            on_parse_failure=j.on_parse_failure,
-            n_calibration_examples=j.n_calibration_examples,
-            backend_label=labels.get(id(j.backend)),
+            temperature=_as_float(getattr(j, "temperature", None)),
+            on_parse_failure=str(getattr(j, "on_parse_failure", "unknown")),
+            n_calibration_examples=_as_int(getattr(j, "n_calibration_examples", 0)),
+            backend_label=labels.get(id(getattr(j, "backend", None))),
         )
         for j in state.judges
     ]

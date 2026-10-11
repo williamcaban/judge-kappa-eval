@@ -51,8 +51,15 @@ class CachedBackend:
             path: JSONL cache file (created if missing). Several backends may share one
                 file; their descriptions keep their entries apart.
             namespace: extra string folded into every key, to separate runs that must
-                not share replies even with identical requests.
+                not share replies even with identical requests. **Required** when ``inner`` has no
+                ``describe()``.
         """
+        if namespace is None and not callable(getattr(inner, "describe", None)):
+            raise ValueError(
+                "CachedBackend needs a `namespace` when the wrapped backend has no describe(): "
+                "without it, two different backends of the same class could share cache entries "
+                "and be served each other's replies."
+            )
         self._inner = inner
         self._path = Path(path)
         self._namespace = namespace
@@ -112,7 +119,7 @@ class CachedBackend:
     def _key(self, system: str, user: str, temperature: float) -> str:
         desc = {k: v for k, v in describe_backend(self._inner).items() if k not in _VOLATILE_KEYS}
         payload = json.dumps(
-            {"b": desc, "ns": self._namespace, "s": system, "u": user, "t": temperature},
+            {"b": desc, "ns": self._namespace, "s": system, "u": user, "t": float(temperature)},
             sort_keys=True, ensure_ascii=False, default=str,
         )
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()

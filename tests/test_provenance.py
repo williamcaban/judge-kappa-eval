@@ -176,6 +176,36 @@ class TestEvalReportProvenance:
         assert gen.description["provider"] == "_Plain" and gen.usage is None
 
 
+class TestProvenanceNeverBreaksAnEvaluation:
+    def test_a_custom_judge_that_exposes_nothing_still_evaluates(self):
+        from judge_kappa.judges.base import LLMJudge
+        from judge_kappa.models import JudgeVerdict
+
+        class _BareJudge(LLMJudge):
+            def __init__(self) -> None:           # deliberately does not call super().__init__
+                self.judge_id = "bare"
+
+            def judge(self, case, output, variant_name):
+                return JudgeVerdict(
+                    judge_id=self.judge_id, eval_case_id=case.id,
+                    variant_name=variant_name, score=0.5, rationale="r",
+                )
+
+        class _Gen:
+            def complete(self, system, user, temperature=0.0):
+                return "out"
+
+        ev = JuryEvaluator(
+            panel=JudgePanel([_BareJudge()]), generation_backend=_Gen(),
+            compute_significance=False, bootstrap_ci=False, compute_judge_fit=False,
+        )
+        report = ev.evaluate(_cases(1), Variant(name="c"), Variant(name="t"))
+        assert report.run is not None
+        assert [j.judge_id for j in report.run.judges] == ["bare"]
+        assert report.run.judges[0].temperature == 0.0
+        assert report.run.judges[0].on_parse_failure == "unknown"
+
+
 class TestTruncationAndAnthropicProvenance:
     def test_generation_truncation_reaches_data_quality(self):
         class _Truncating:

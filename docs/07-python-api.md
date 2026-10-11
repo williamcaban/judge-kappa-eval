@@ -456,7 +456,7 @@ See [10-psychometric-methods.md](10-psychometric-methods.md) §10 for the model 
 
 ---
 
-## Pattern 15 — Reliable, resumable runs (v0.4)
+## Pattern 15 — Reliable, resumable runs (v0.3.1)
 
 ```python
 from judge_kappa import (
