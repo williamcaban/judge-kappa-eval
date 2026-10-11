@@ -314,6 +314,31 @@ Spearman ρ with ground truth: 0.9167  (p=0.0007)
 
 ---
 
+## 13 — Order-aware tournament ranking (position-biased judge)
+
+**When to use:** you rank N systems with a pairwise judge and want to know whether the judge favours the first-shown response, and by how much.  
+**Script:** `examples/demo_order_aware_ranking.py`  
+**No API key required** — a deterministic, noisy mock judge adds a bonus to the first-shown output.
+
+```bash
+python examples/demo_order_aware_ranking.py
+```
+
+Expected output (abridged; exact numbers depend on the seeded noise):
+```
+1) One display order only (detect_positional_bias=False):
+...
+Judge order effect: not identifiable (pairs were judged in one display order only)
+
+2) Both display orders, order-aware BTL ratings (default):
+Rank  System        Elo   Win%   ...   95% CI (Elo)
+1     alpha       ~1440  100.0%         [~1330, ~1750]
+...
+Judge order effect (log-odds, + favours first-shown): ~+2.9 [~+2.2, ~+4.9]
+```
+
+---
+
 ## Example files index
 
 | File | Type | API key? | What it shows |
@@ -328,5 +353,6 @@ Spearman ρ with ground truth: 0.9167  (p=0.0007)
 | `config_regulatory.yaml` | YAML config | yes | positional + verbosity bias for compliance |
 | `config_mixed_panel.yaml` | YAML config | yes | 4 providers in one panel |
 | `demo_psychometric.py` | Python script | **no** | CIs, ICC, person-fit, DIF, McNemar |
+| `demo_order_aware_ranking.py` | Python script | **no** | order-aware BTL ratings, order effect with interval |
 | `demo_irt_weighting.py` | Python script | **no** | IRT judge weighting from calibration data |
 | `demo_rank_judge.py` | Python script | **no** | listwise ranking for N ≥ 7 systems |

@@ -434,6 +434,28 @@ print(result.alpha_interpretation)
 
 ---
 
+## Pattern 14 — Order-aware ranking and the display-order effect (v0.3)
+
+```python
+from judge_kappa import TournamentEvaluator, PositionalBiasDetector, fit_btl, ComparisonGame
+
+# Tournament: ratings are an order-aware BTL fit on the Elo scale, with bootstrap intervals
+report = TournamentEvaluator(judge, n_bootstrap=500).run(cases, systems)
+report.print_leaderboard()
+print(report.order_effect, report.order_effect_ci, report.order_identifiable)
+
+# Control vs treatment: judge-level order effect from the swap test
+est = PositionalBiasDetector.estimate_order_effect(position_reports)
+print(est.order_effect, est.ci_low, est.ci_high)
+
+# Low-level: fit your own comparisons
+fit = fit_btl(n_items=3, games=[ComparisonGame(case=0, i=0, j=1, order=1, outcome=1.0), ...])
+```
+
+See [10-psychometric-methods.md](10-psychometric-methods.md) §10 for the model and its limits.
+
+---
+
 ## Accessing output report fields
 
 ```python

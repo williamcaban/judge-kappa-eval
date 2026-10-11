@@ -437,6 +437,9 @@ class JuryEvaluator:
         )
         corpus_bias = BiasResult(
             positional_bias_rate=pos_bias_result.positional_bias_rate,
+            order_effect=pos_bias_result.order_effect,
+            order_effect_ci_low=pos_bias_result.order_effect_ci_low,
+            order_effect_ci_high=pos_bias_result.order_effect_ci_high,
             verbosity_bias_rho=verb_bias.verbosity_bias_rho,
             verbosity_bias_p=verb_bias.verbosity_bias_p,
             verbosity_biased=verb_bias.verbosity_biased,

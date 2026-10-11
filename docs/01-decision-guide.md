@@ -69,7 +69,8 @@ Use this tree to pick the right mode for your situation.
 │   See: docs/03-pairwise-tournament.md
 │
 ├─ 3–6 systems  ──────────────────────────────────────────────── Tournament
-│   Full round-robin: every pair compared; produces Elo leaderboard.
+│   Full round-robin: every pair compared; produces Elo-scale leaderboard.
+│   Order-aware BTL ratings with bootstrap CIs and a judge order effect (v0.3).
 │   Cost: N(N−1) × M judge calls (with bias detection).
 │   → TournamentEvaluator
 │   See: docs/03-pairwise-tournament.md
@@ -149,6 +150,7 @@ See: docs/10-psychometric-methods.md  (full guide)
 | Score pre-recorded outputs | prerecorded + rubric + panel | `config_prerecorded.yaml` |
 | A/B preference rates | pairwise | `config_pairwise.yaml` |
 | N-system leaderboard (N ≤ 6) | TournamentEvaluator | Python API |
+| Quantify a judge's first-position preference (with CI) | PositionalBiasDetector.estimate_order_effect / TournamentEvaluator | `demo_order_aware_ranking.py` |
 | N-system ranking (N ≥ 7) | RankJudge | `demo_rank_judge.py` |
 | Regulatory evidence | skill/dataset + regulatory config | `config_regulatory.yaml` |
 | Mixed providers (4 backends) | any panel/jury | `config_mixed_panel.yaml` |

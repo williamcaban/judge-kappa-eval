@@ -241,6 +241,44 @@ A practitioner can use this document to understand the theoretical basis of each
 
 ---
 
+## 19 — Bradley-Terry-Luce model with a within-pair order effect
+
+**What it is.** The Bradley-Terry-Luce (BTL) model gives each item a latent strength and models the probability that one item is preferred to another as a logistic function of the strength difference. Davidson and Beaver extended it with a parameter for the advantage of the item presented first, which makes presentation order a nuisance effect rather than part of quality. The order effect is separable from item strength only when the comparison design supplies enough information: both display orders of some pair, or a cycle with a non-zero signed sum of orders.
+
+**In judge-kappa.** `judge_kappa.ranking.btl` (`fit_btl`, `bootstrap_btl`). Used by `TournamentEvaluator` for ratings with intervals, and by `PositionalBiasDetector.estimate_order_effect` for a per-judge order effect. Scores are ridge-penalised maximum-likelihood estimates; cases are the bootstrap unit.
+
+**Primary sources.**
+- Bradley, R. A., & Terry, M. E. (1952). Rank analysis of incomplete block designs: I. The method of paired comparisons. *Biometrika*, 39(3/4), 324–345.
+- Luce, R. D. (1959). *Individual Choice Behavior: A Theoretical Analysis*. Wiley.
+- Davidson, R. R., & Beaver, R. J. (1977). On extending the Bradley-Terry model to incorporate within-pair order effects. *Biometrics*, 33(4), 693–702.
+- Augustin, T. (2004). Bradley-Terry-Luce models to incorporate within-pair order effects: Representation and uniqueness theorems. *British Journal of Mathematical and Statistical Psychology*, 57(2), 281–294.
+
+---
+
+## 20 — Balanced Position Calibration
+
+**What it is.** A mitigation for position bias in LLM judges: query each comparison in both display orders and aggregate the two evaluations, so a preference for the first-shown response cancels out.
+
+**In judge-kappa.** Win/loss/tie counts and the win matrix in `TournamentEvaluator` use per-case scores averaged over both orders when `detect_positional_bias=True`.
+
+**Primary sources.**
+- Wang, P., et al. (2024). Large language models are not fair evaluators. *Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)*, 9440–9450.
+
+---
+
+## 21 — DIAL: position-debiased multi-judge ranking with human calibration (design reference)
+
+**What it is.** A statistical framework that separates judge-specific position effects from latent LLM preferences in an order-effect BTL model, learns shared structure across a panel of judges, and calibrates that structure toward a human preference target using limited pairwise human labels, with adaptive weighting selected by generalised approximate cross-validation. It is a v1 preprint evaluated on three benchmarks with 5 to 20 candidate systems; ties and heterogeneous human preferences are future work.
+
+**In judge-kappa.** Design reference only. Only the single-judge order-effect BTL stage is implemented (entry 19). The multi-judge low-rank structure and human calibration are not implemented; no DIAL code is used or distributed. The authors' repository is MIT-licensed with an anonymised copyright line, and was used as a numerical cross-check during development only.
+
+**Primary sources.**
+- Cai, Z., Fan, Y., Chen, S., & Du, J.-H. (2026). DIAL: Position-debiased LLM judges with adaptive human preference calibration. *arXiv:2609.31215*.
+- Yu, S., Wang, Y., Chen, Y., Li, G., & Du, J.-H. (2026). Heterogeneous judge-aware ranking with sensitivity, disagreement, and confidence. *arXiv:2605.05073*.
+- Xu, J., Zeng, D., Paisley, J., & Zhao, Q. (2026). When can you debias an LLM judge? Identifiability limits, a test, and designs for top-k ranking. *arXiv:2607.02104*.
+
+---
+
 ## Consolidated bibliography
 
 | # | Method | Key reference |
@@ -263,3 +301,6 @@ A practitioner can use this document to understand the theoretical basis of each
 | 16 | Listwise ranking | Cao et al. (2007) *ICML*; Liu et al. (2023) *EMNLP* |
 | 17 | Softmax weighting | Bridle (1990); Goodfellow et al. (2016) *Deep Learning* |
 | 18 | Classical Test Theory | Lord & Novick (1968); Cronbach (1951) *Psychometrika* |
+| 19 | BTL with order effect | Bradley & Terry (1952) *Biometrika*; Davidson & Beaver (1977) *Biometrics*; Augustin (2004) *BJMSP* |
+| 20 | Balanced Position Calibration | Wang et al. (2024) *ACL* |
+| 21 | DIAL (design reference) | Cai et al. (2026) *arXiv:2609.31215* |
