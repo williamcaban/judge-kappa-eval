@@ -1,0 +1,16 @@
+version: 2
+updates:
+  # Each bump arrives as a PR that CI (tests + dependency audit) checks before it is merged.
+  # Actions stay pinned to full commit SHAs; Dependabot keeps the SHA and the version comment in sync.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"

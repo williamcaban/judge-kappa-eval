@@ -1,6 +1,5 @@
 # uv
 .venv/
-uv.lock
 
 # Python
 __pycache__/

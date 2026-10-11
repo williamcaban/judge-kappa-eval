@@ -9,6 +9,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- CI hardening: dependency audit (`pip-audit`, PR/push/weekly), Dependabot for
+  Actions and Python, Actions pinned to commit SHAs with read-only token
+  permissions, commit-hygiene check, TestPyPI gate before PyPI releases,
+  committed `uv.lock`, and a `SECURITY.md` policy.
+
 ### Added
 
 - **Order-aware Bradley-Terry ranking** (`judge_kappa.ranking`): `fit_btl`,
