@@ -231,7 +231,31 @@ class TestUncertainty:
             assert boot.scores_low[k] < fit.scores[k] < boot.scores_high[k]
             assert boot.scores_low[k] <= centred[k] <= boot.scores_high[k]
         assert boot.order_effect_low is not None and boot.order_effect_high is not None
-        assert 0.0 < boot.order_effect_low < 1.0 < boot.order_effect_high + 0.5
+        assert fit.order_effect is not None
+        # Deterministic contract for the fixed seed: the interval brackets the point
+        # estimate (a single bootstrap draw does not guarantee covering the truth).
+        assert boot.order_effect_low < fit.order_effect < boot.order_effect_high
+
+    def test_order_interval_requires_enough_identifiable_replicates(self):
+        # Only case 0 contains both display orders; the other cases show order +1 only.
+        # A replicate keeps the order effect identifiable iff it resamples case 0, so with
+        # n_boot=2 some seeds yield exactly one identifiable draw. That must not be published
+        # as a (degenerate, zero-width) interval.
+        games = [ComparisonGame(0, 0, 1, 1, 1.0), ComparisonGame(0, 0, 1, -1, 0.0)]
+        games += [ComparisonGame(k, 0, 1, 1, 1.0 if k % 3 else 0.0) for k in range(1, 40)]
+        assert order_effect_identifiable(2, games)
+
+        published, withheld = 0, 0
+        for seed in range(40):
+            boot = bootstrap_btl(2, games, n_boot=2, seed=seed)
+            assert (boot.order_effect_low is None) == (boot.order_effect_high is None)
+            if boot.order_effect_low is None:
+                withheld += 1
+            else:
+                published += 1
+                assert boot.order_effect_high is not None
+                assert boot.order_effect_low < boot.order_effect_high   # never zero-width
+        assert withheld > 0 and published > 0   # both branches were exercised
 
     def test_bootstrap_validation(self):
         games = _simulate([0.0, 0.0], 0.0, n_reps=10, seed=0)

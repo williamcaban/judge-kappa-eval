@@ -311,7 +311,9 @@ def bootstrap_btl(
     Cases (prompts) are resampled with replacement and every game of a drawn
     case is carried along, so pairs judged on the same prompt stay together.
     Replicates whose resampled design is disconnected are skipped; if fewer
-    than half survive a ``ValueError`` is raised.
+    than half survive a ``ValueError`` is raised. The order-effect interval is
+    reported only when at least ``max(2, n_boot // 2)`` replicates kept the order
+    effect identifiable; otherwise both bounds are ``None``.
     """
     if n_boot < 2:
         raise ValueError("n_boot must be at least 2")
@@ -345,6 +347,10 @@ def bootstrap_btl(
     if len(score_draws) < n_boot // 2:
         raise ValueError("too many bootstrap replicates had a disconnected comparison graph")
 
+    # A replicate can stay connected yet lose order identifiability. Publish an order-effect
+    # interval only from enough identifiable replicates; a single draw would give a degenerate one.
+    publish_order = with_order and len(order_draws) >= max(2, n_boot // 2)
+
     alpha = (1.0 - ci_level) / 2.0
     stacked = np.vstack(score_draws)
     low = np.quantile(stacked, alpha, axis=0)
@@ -354,6 +360,6 @@ def bootstrap_btl(
         n_boot=len(score_draws),
         scores_low=[float(v) for v in low],
         scores_high=[float(v) for v in high],
-        order_effect_low=float(np.quantile(order_draws, alpha)) if with_order and order_draws else None,
-        order_effect_high=float(np.quantile(order_draws, 1.0 - alpha)) if with_order and order_draws else None,
+        order_effect_low=float(np.quantile(order_draws, alpha)) if publish_order else None,
+        order_effect_high=float(np.quantile(order_draws, 1.0 - alpha)) if publish_order else None,
     )
