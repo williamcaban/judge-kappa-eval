@@ -1,12 +1,12 @@
 """
-jury-eval CLI entry point.
+judge-kappa CLI entry point.
 
 Usage:
-  jury-eval run config.yaml
-  jury-eval run config.yaml --output report.json --format json
-  jury-eval run config.yaml --format text
-  jury-eval schema                    # print JSON Schema for config file
-  jury-eval validate config.yaml      # validate config without running evaluation
+  judge-kappa run config.yaml
+  judge-kappa run config.yaml --output report.json --format json
+  judge-kappa run config.yaml --format text
+  judge-kappa schema                    # print JSON Schema for config file
+  judge-kappa validate config.yaml      # validate config without running evaluation
 
 The CLI is intentionally thin: all logic lives in builder.py and evaluator.py.
 """
@@ -200,9 +200,9 @@ def app() -> None:
     if not args or args[0] in ("-h", "--help"):
         print(
             "Usage:\n"
-            "  jury-eval run <config.yaml> [--output FILE] [--format json|text|jsonl] [--verdicts]\n"
-            "  jury-eval validate <config.yaml>\n"
-            "  jury-eval schema\n"
+            "  judge-kappa run <config.yaml> [--output FILE] [--format json|text|jsonl] [--verdicts]\n"
+            "  judge-kappa validate <config.yaml>\n"
+            "  judge-kappa schema\n"
         )
         return
 
@@ -245,4 +245,4 @@ def app() -> None:
         cmd_run(config_path, output_file, fmt, include_verdicts)
 
     else:
-        _die(f"Unknown command: {cmd!r}. Run 'jury-eval --help'.")
+        _die(f"Unknown command: {cmd!r}. Run 'judge-kappa --help'.")

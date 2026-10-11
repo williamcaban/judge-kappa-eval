@@ -4,11 +4,11 @@ Example 1 — Skill evaluation (agent-skills-eval compatible).
 Runs a 3-judge panel on a SKILL.md skill directory, measuring uplift,
 inter-rater agreement (Krippendorff's α), and positional bias.
 
-Install: pip install 'jury-eval[all]'
+Install: pip install 'judge-kappa[all]'
 Run:     python examples/skill_eval.py
 """
 
-from jury_eval import (
+from judge_kappa import (
     AnthropicBackend,
     AssertionJudge,
     CalibrationExample,

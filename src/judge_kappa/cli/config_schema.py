@@ -1,5 +1,5 @@
 """
-Declarative YAML config schema for the jury-eval CLI.
+Declarative YAML config schema for the judge-kappa CLI.
 
 All CLI runs are driven by a config file so evaluations are reproducible.
 API keys are NEVER stored in config files — they are always read from

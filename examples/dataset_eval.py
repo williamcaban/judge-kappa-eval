@@ -5,11 +5,11 @@ A JudgeJury uses three judges with different rubrics and models to
 score a RAG pipeline's outputs. Aggregates via weighted mean.
 Measures Krippendorff's α as a jury-diversity diagnostic.
 
-Install: pip install 'jury-eval[all]'
+Install: pip install 'judge-kappa[all]'
 Run:     python examples/dataset_eval.py
 """
 
-from jury_eval import (
+from judge_kappa import (
     AnthropicBackend,
     AggregationStrategy,
     JudgeJury,
@@ -120,7 +120,7 @@ evaluator = JuryEvaluator(
 )
 
 # Baseline: system prompt A vs system prompt B
-from jury_eval import Variant
+from judge_kappa import Variant
 
 control   = Variant(name="baseline",  predict_fn=my_rag_pipeline)
 treatment = Variant(name="optimized", predict_fn=my_rag_pipeline)  # swap in improved pipeline
