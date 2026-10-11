@@ -9,6 +9,45 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **Explicit, inspectable request parameters.** `max_tokens`, `max_tokens_param`,
+  `omit_temperature`, `timeout_s` and `max_retries` on `OpenAIBackend`,
+  `AnthropicBackend` and the YAML `backend:` block. Replies that hit the output-token
+  limit are detected from the finish reason.
+- **Usage capture.** Optional `complete_with_usage()` returns an `LLMResponse` (text,
+  input/output tokens, finish reason, model, latency); `call_backend()` falls back to
+  `complete()` so the public `LLMBackend` Protocol is unchanged. Built-in backends keep a
+  thread-safe `UsageStats`.
+- **Parse-failure accounting.** Judges validate replies and set `parse_failed`,
+  `parse_error` and `truncated` on verdicts; reports carry `data_quality` (counts by judge
+  and code, truncations, warnings). `on_parse_failure="raise"` raises `JudgeParseError`.
+  `TournamentEvaluator(exclude_parse_failures=True)` drops unusable rounds.
+- **Run provenance.** `EvalReport.run`, `PairwiseReport.run` and `TournamentReport.run`
+  record library/SDK versions, evaluator settings, per-judge and per-backend
+  configuration, and per-backend usage (scoped to the run, no secrets).
+- **`CachedBackend` / `backend.cache_path`**: append-only JSONL response cache. An
+  interrupted run resumes by re-running with the same file; re-runs are free and exactly
+  reproducible.
+- **`max_workers`** on `JuryEvaluator`, `TournamentEvaluator`, `evaluate_pairwise_dataset`
+  and YAML configs. Default 1 (sequential, no threads); results are identical for any value.
+- CLI text report prints data-quality warnings and a usage line.
+- `docs/12-reliability-and-reproducibility.md` and `examples/demo_reliability_controls.py`.
+
+### Changed
+
+- **Anthropic backend now sends `temperature` explicitly, including `0.0`.** Earlier
+  releases dropped it when it was `0.0`, so the API default (documented as 1.0) applied and
+  judges configured as deterministic were not. Scores for Anthropic judges can differ from
+  0.3.x, and agreement usually improves. Re-baseline stored comparisons. Models that reject
+  the parameter: set `omit_temperature: true`.
+- **Unusable judge replies are no longer silent.** Valid replies score exactly as before.
+  The historical fallback scores are kept by default (so numbers do not move) but are
+  flagged, logged (first 5 per judge) and counted. A non-dict JSON reply no longer raises
+  `AttributeError`, and a non-numeric `PairwiseJudge` score no longer raises `ValueError`.
+- Anthropic replies are assembled from text blocks, so a leading thinking block no longer
+  breaks extraction.
+
 ### Fixed
 
 - Stale package name `jury-eval` / `jury_eval` removed from user-facing text:

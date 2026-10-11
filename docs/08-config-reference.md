@@ -30,7 +30,20 @@ generation:
     model: "claude-sonnet-4-6"         # required
     base_url: "http://..."             # optional — vLLM, Ollama, OpenRouter, etc.
     api_key_env: "MY_VAR"             # optional — see docs/05-key-management.md
+    max_tokens: 4096                  # optional — output cap (Anthropic default 2048)
+    max_tokens_param: max_tokens      # optional — or max_completion_tokens (OpenAI reasoning models)
+    omit_temperature: false           # optional — true never sends `temperature`
+    timeout_s: 120                    # optional — per-request, forwarded to the SDK
+    max_retries: 4                    # optional — SDK-level retries (429, 5xx, connection)
+    cache_path: runs/cache.jsonl      # optional — response cache; resume by re-running
 ```
+
+`temperature` is always sent (including `0.0`) unless `omit_temperature: true`. Every `backend:`
+block in the file (generation, per-variant, judges, positional/pairwise judge) accepts the
+same fields. Details and migration notes: [12-reliability-and-reproducibility.md](12-reliability-and-reproducibility.md).
+
+Top-level `max_workers: N` (any mode, default `1`) judges cases or pairs concurrently; results
+are identical for any value.
 
 For per-variant generation (endpoint comparison), add `generation` inside the `control` or `treatment` block:
 

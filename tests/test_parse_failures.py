@@ -113,6 +113,16 @@ class TestAssertionJudge:
             _assertion_judge("nope").judge(_case(), "out", "control")
         assert any("unusable reply" in r.message for r in caplog.records)
 
+    def test_warnings_are_capped_per_judge_but_all_failures_are_counted(self, caplog):
+        judge = _assertion_judge("nope")
+        with caplog.at_level(logging.DEBUG, logger="judge_kappa.judges"):
+            verdicts = [judge.judge(_case(), "out", "control") for _ in range(12)]
+        assert all(v.parse_failed for v in verdicts)
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        debug = [r for r in caplog.records if r.levelno == logging.DEBUG]
+        assert len(warnings) == 5 and len(debug) == 7
+        assert "logged at DEBUG" in warnings[-1].getMessage()
+
     def test_plain_backend_without_usage_still_works(self):
         class _Plain:
             def complete(self, system, user, temperature=0.0):

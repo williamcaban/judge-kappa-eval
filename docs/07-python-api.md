@@ -456,6 +456,34 @@ See [10-psychometric-methods.md](10-psychometric-methods.md) §10 for the model 
 
 ---
 
+## Pattern 15 — Reliable, resumable runs (v0.4)
+
+```python
+from judge_kappa import (
+    AnthropicBackend, AssertionJudge, CachedBackend, JudgePanel, JuryEvaluator,
+    TournamentEvaluator,
+)
+
+# Explicit request parameters; every reply cached as it completes (resume by re-running).
+backend = CachedBackend(
+    AnthropicBackend("claude-sonnet-4-6", max_tokens=4096, timeout_s=120, max_retries=4),
+    "runs/judge-cache.jsonl",
+)
+judge = AssertionJudge("j1", backend, on_parse_failure="flag")   # or "raise" to fail fast
+
+ev = JuryEvaluator(panel=JudgePanel([judge]), generation_backend=backend, max_workers=8)
+report = ev.evaluate_dataset(data, predict_fn)
+
+report.data_quality.n_parse_failures      # unusable judge replies (fallback scores included)
+report.data_quality.warnings              # human-readable
+report.run.backends[0].usage              # calls, tokens, truncations, cache hits
+report.run.judges[0].temperature          # what actually ran
+```
+
+See [12-reliability-and-reproducibility.md](12-reliability-and-reproducibility.md).
+
+---
+
 ## Accessing output report fields
 
 ```python

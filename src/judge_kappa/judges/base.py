@@ -25,6 +25,7 @@ from judge_kappa.models import CalibrationExample, EvalCase, JudgeVerdict
 logger = logging.getLogger("judge_kappa.judges")
 
 ParseFailurePolicy = Literal["flag", "raise"]
+_MAX_WARNED_REPLIES = 5   # per judge instance; later ones are logged at DEBUG
 
 
 class JudgeParseError(ValueError):
@@ -109,6 +110,7 @@ class LLMJudge(ABC):
         self._calibration = calibration_examples or []
         self._temperature = temperature
         self._on_parse_failure = on_parse_failure
+        self._unusable_replies = 0
 
     @property
     def backend(self) -> LLMBackend:
@@ -188,9 +190,15 @@ class LLMJudge(ABC):
 
         if error is not None:
             excerpt = resp.text[:120]
-            logger.warning(
-                "judge %s case %s: unusable reply (%s); fallback score used: %r",
+            self._unusable_replies += 1
+            # Log the first few per judge; the report's data_quality carries the totals.
+            level = logging.WARNING if self._unusable_replies <= _MAX_WARNED_REPLIES else logging.DEBUG
+            logger.log(
+                level,
+                "judge %s case %s: unusable reply (%s); fallback score used: %r%s",
                 self.judge_id, case_id, error, excerpt,
+                " (further unusable replies from this judge are logged at DEBUG)"
+                if self._unusable_replies == _MAX_WARNED_REPLIES else "",
             )
             if self._on_parse_failure == "raise":
                 raise JudgeParseError(self.judge_id, case_id, error, excerpt)

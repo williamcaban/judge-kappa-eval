@@ -211,6 +211,7 @@ With `detect_positional_bias=True` (default) every pair is judged in both displa
 - **`elo`** comes from an order-aware Bradley-Terry maximum-likelihood fit (`rating_method="btl"`, default), expressed on the Elo scale (mean 1000). It uses ordinal outcomes per game (win/tie/loss), not score margins, so the two views can differ when a judge's scores are informative but a position bonus dominates.
 - **Intervals**: `n_bootstrap=500` case-level bootstrap replicates give per-system intervals (`btl_ci_low`/`btl_ci_high`, log-odds) and an interval for the judge's **order effect**. Set `n_bootstrap=0` to disable.
 - `rating_method="elo"` restores the v0.2 sequential-Elo update on the win matrix.
+- `max_workers=N` judges games concurrently; ratings are identical for any value. `exclude_parse_failures=True` drops unusable judge rounds instead of rating them as 0.5/0.5 ties. Both, and the response cache that makes an interrupted tournament resumable, are described in [12-reliability-and-reproducibility.md](12-reliability-and-reproducibility.md).
 
 ```python
 report = TournamentEvaluator(judge, n_bootstrap=500).run(cases, systems)

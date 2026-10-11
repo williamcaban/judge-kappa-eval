@@ -110,7 +110,21 @@ Per-case results:
   case-001      uplift=+0.310  ctrl=0.450  trt=0.760  α=0.834
   case-002      uplift=+0.190  ctrl=0.580  trt=0.770  α=0.801
   case-003      uplift=+0.203  ctrl=0.506  trt=0.709  α=0.799
+
+LLM calls: 24 (0 from cache)  tokens in/out: 18420/2310  duration: 41.3s
 ```
+
+When judge replies were unusable or truncated, a `Data quality warnings:` section is printed
+before the usage line, for example:
+
+```
+Data quality warnings:
+  ⚠ 3 of 40 judge replies (7.5%) were unusable (invalid_json x3). Their verdicts carry
+    fallback scores that are included in the aggregate metrics. ...
+```
+
+The JSON report always carries `data_quality` and `run` (versions, per-judge and per-backend
+configuration, usage); see [12-reliability-and-reproducibility.md](12-reliability-and-reproducibility.md).
 
 ### `--format json`
 
