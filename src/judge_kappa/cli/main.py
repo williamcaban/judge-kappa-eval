@@ -209,6 +209,7 @@ def cmd_run(config_path: str, output_file: str | None, fmt: str, include_verdict
     else:  # dataset mode
         data = load_dataset(config.dataset_file)
         def _output_fn(x: dict[str, object]) -> str:
+            """Return the row's recorded ``output`` as the variant output."""
             return str(x.get("output", ""))
         report = evaluator.evaluate_dataset(data=data, predict_fn=_output_fn)
 
