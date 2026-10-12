@@ -51,8 +51,9 @@ jobs:
         if: matrix.python-version == '3.12'
         with:
           files: ./coverage.xml
-          # Without this secret the upload is rejected ("Token required - not valid tokenless upload"),
-          # and fail_ci_if_error: false keeps CI green. Add it with: gh secret set CODECOV_TOKEN
+          # Repository secret CODECOV_TOKEN authenticates the upload (Settings > Secrets and variables
+          # > Actions). Fork PRs and Dependabot PRs do not receive it, so their upload is rejected
+          # and, with fail_ci_if_error: false, does not fail the job. Thresholds: codecov.yml.
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 

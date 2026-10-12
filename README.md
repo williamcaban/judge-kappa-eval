@@ -1,5 +1,9 @@
 # judge-kappa
 
+[![CI](https://github.com/williamcaban/judge-kappa-eval/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/williamcaban/judge-kappa-eval/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/williamcaban/judge-kappa-eval/branch/main/graph/badge.svg)](https://codecov.io/gh/williamcaban/judge-kappa-eval)
+[![PyPI](https://img.shields.io/pypi/v/judge-kappa.svg)](https://pypi.org/project/judge-kappa/)
+
 Unified LLM evaluation that bridges **agent-skills-eval** (A/B uplift, assertion lists) and **MLflow LLMaJ** (datasets, named rubric dimensions) while adding statistical rigor missing from both.
 
 ## Feature matrix
