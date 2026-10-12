@@ -45,14 +45,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (README, `docs/10` §9, the detector's module docstring). Lengths are whitespace word counts of
   the evaluated output; `docs/10` §9 now says so, and explains how to supply your own measure for
   CJK text and code.
-- **`judge-kappa run --format text` no longer crashes when there is no judge pair.** The text
-  report formatted `Krippendorff α`, `Cohen κ` and `Expected P(e)` with `:.4f` unconditionally and
-  raised `TypeError` when they are `None`, which is the case for every single-judge run and for
-  runs where no two judges share 2 cases. They now print `n/a (needs ...)`; identical scores, where
-  κ is `NaN`, print `undefined (scores do not vary)`. With a single judge, α prints
-  `n/a (needs at least 2 judges)` instead of the model's `1.0` fallback, which would read as perfect
-  agreement between judges. The JSON report is unchanged.
-
+- **`judge-kappa run --format text` no longer crashes when there is no judge pair.**
+  `AgreementResult.kappa` and `AgreementResult.expected_chance_agreement` are `None` whenever no
+  two judges share 2 cases, which includes every single-judge run, and the text report formatted
+  them with `:.4f`, so it raised `TypeError`. They now print `n/a (needs ...)`, and `NaN`
+  (identical scores) prints `undefined (scores do not vary)`. `alpha` is not `None` in that
+  situation: the model reports its `1.0` single-value-domain fallback, so for a single judge the
+  text report prints `n/a (needs at least 2 judges)` rather than a value that reads as perfect
+  agreement between judges. The model and the JSON report are unchanged.
 ---
 
 ## [0.3.1] — 2026-10-12
