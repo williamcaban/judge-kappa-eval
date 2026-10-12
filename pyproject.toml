@@ -135,4 +135,7 @@ omit   = [
 [tool.coverage.report]
 show_missing = true
 skip_covered = false
-fail_under   = 70
+# Coverage floor: `pytest --cov` (as CI runs it) fails below this total, on both Python versions.
+# Measured coverage is ~93%; the floor sits ~3 points under it, so a regression is caught but
+# ordinary additions are not blocked. Raise it as coverage grows, never lower it to merge.
+fail_under   = 90
