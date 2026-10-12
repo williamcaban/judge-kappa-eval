@@ -495,13 +495,14 @@ report = evaluator.evaluate_skill("./my-skill")
 # Corpus-level agreement (v0.2: + CI and ICC)
 report.mean_uplift                        # float: treatment − control
 report.agreement.alpha                    # Krippendorff's α; None when not estimated
-report.agreement.alpha_not_estimated_reason  # None, "single_judge", "no_pairable_values"
+report.agreement.alpha_not_estimated_reason  # None, "single_judge", "no_pairable_values", "no_score_variation"
 report.agreement.alpha_ci_low            # 95% bootstrap CI lower bound (v0.2)
 report.agreement.alpha_ci_high           # 95% bootstrap CI upper bound (v0.2)
 report.agreement.alpha_interpretation     # "strong agreement (α ≥ 0.80)"
 report.agreement.kappa                    # Cohen's κ (mean pairwise); None when not estimated
 report.agreement.kappa_not_estimated_reason  # None, "no_judge_pair", "no_score_variation"
-report.agreement.icc                      # ICC(2,k) absolute agreement (v0.2)
+report.agreement.icc                      # ICC(2,k) absolute agreement (v0.2); None when not estimated
+report.agreement.icc_not_estimated_reason # None, "insufficient_data", "no_score_variation"
 report.agreement.icc_interpretation       # "excellent reliability (ICC ≥ 0.75)" (v0.2)
 report.agreement.expected_chance_agreement # P(e)
 
