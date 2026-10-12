@@ -1,8 +1,21 @@
 # judge-kappa
 
+<!-- Build and tests -->
 [![CI](https://github.com/williamcaban/judge-kappa-eval/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/williamcaban/judge-kappa-eval/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/williamcaban/judge-kappa-eval/branch/main/graph/badge.svg)](https://codecov.io/gh/williamcaban/judge-kappa-eval)
+[![docstring coverage: 100% enforced](https://img.shields.io/badge/docstring%20coverage-100%25%20enforced-brightgreen)](https://github.com/williamcaban/judge-kappa-eval/blob/main/pyproject.toml)
+[![dependencies: pip-audit in CI](https://img.shields.io/badge/dependencies-pip--audit%20in%20CI-blue)](https://github.com/williamcaban/judge-kappa-eval/actions/workflows/ci.yml)
+
+<!-- Code quality -->
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![mypy: strict](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/williamcaban/judge-kappa-eval/blob/main/.pre-commit-config.yaml)
+
+<!-- Package -->
 [![PyPI](https://img.shields.io/pypi/v/judge-kappa.svg)](https://pypi.org/project/judge-kappa/)
+[![Python versions](https://img.shields.io/pypi/pyversions/judge-kappa.svg)](https://pypi.org/project/judge-kappa/)
+[![License](https://img.shields.io/pypi/l/judge-kappa.svg)](https://github.com/williamcaban/judge-kappa-eval/blob/main/LICENSE)
+[![Wheel](https://img.shields.io/pypi/wheel/judge-kappa.svg)](https://pypi.org/project/judge-kappa/#files)
 
 Unified LLM evaluation that bridges **agent-skills-eval** (A/B uplift, assertion lists) and **MLflow LLMaJ** (datasets, named rubric dimensions) while adding statistical rigor missing from both.
 

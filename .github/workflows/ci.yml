@@ -52,8 +52,11 @@ jobs:
         with:
           files: ./coverage.xml
           # Repository secret CODECOV_TOKEN authenticates the upload (Settings > Secrets and variables
-          # > Actions). Fork PRs and Dependabot PRs do not receive it, so their upload is rejected
-          # and, with fail_ci_if_error: false, does not fail the job. Thresholds: codecov.yml.
+          # > Actions). Fork PRs never receive repository secrets; Codecov accepts tokenless uploads
+          # from forks of a public repository. Dependabot PRs read a separate secret store: add the
+          # token with `gh secret set CODECOV_TOKEN --app dependabot` if their uploads should
+          # succeed. A failed upload does not fail the job (fail_ci_if_error: false). Thresholds:
+          # codecov.yml.
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
