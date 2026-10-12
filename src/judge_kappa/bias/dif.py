@@ -39,6 +39,7 @@ from judge_kappa.models import BiasResult, JudgeVerdict
 
 @dataclass
 class DIFCaseResult:
+    """Differential-item-functioning statistics for one eval case."""
     case_id: str
     n_verdicts: int
     group_coefficient: float   # β₂ from logistic regression
@@ -48,12 +49,14 @@ class DIFCaseResult:
 
 @dataclass
 class DIFReport:
+    """Result of a DIF analysis: the flagged case ids and per-case statistics."""
     flagged_cases: list[str]                   # case_ids with significant DIF
     per_case: list[DIFCaseResult] = field(default_factory=list)
     n_groups: int = 0
     alpha_threshold: float = 0.05
 
     def summary(self) -> str:
+        """One-line summary: how many cases were flagged, across how many judge families."""
         return (
             f"{len(self.flagged_cases)}/{len(self.per_case)} cases flagged for DIF "
             f"({self.n_groups} judge families, α={self.alpha_threshold})"
@@ -86,6 +89,7 @@ class DifferentialItemFunctioningDetector(BiasDetector):
         min_verdicts_per_case: int = 4,
         min_groups: int = 2,
     ) -> None:
+        """Configure thresholds; see the class docstring for each argument."""
         self._alpha = alpha_threshold
         self._positive_threshold = positive_threshold
         self._min_per_case = min_verdicts_per_case

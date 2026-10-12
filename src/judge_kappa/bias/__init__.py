@@ -1,3 +1,5 @@
+"""Bias detectors: positional, verbosity and differential item functioning."""
+
 from judge_kappa.bias.base import BiasDetector
 from judge_kappa.bias.dif import DIFCaseResult, DifferentialItemFunctioningDetector, DIFReport
 from judge_kappa.bias.positional import (

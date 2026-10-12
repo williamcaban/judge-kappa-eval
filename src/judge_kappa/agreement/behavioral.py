@@ -34,6 +34,7 @@ from judge_kappa.models import AgreementResult, JudgeVerdict, ScaleType
 
 
 def _interpret_behavioral(alpha: float) -> str:
+    """Map an alpha value to a behavioural-consistency band (stability across conditions)."""
     if alpha >= 0.80:
         return "behaviorally consistent across conditions (α ≥ 0.80)"
     elif alpha >= 0.67:
@@ -51,6 +52,8 @@ class BehavioralAlignmentMetric:
     """
 
     def __init__(self, bootstrap_ci: bool = True, n_bootstrap: int = 2000, seed: int = 42) -> None:
+        """Configure the underlying Krippendorff's alpha (same arguments as ``KrippendorffAlpha``).
+        """
         self._alpha_metric = KrippendorffAlpha(
             bootstrap_ci=bootstrap_ci, n_bootstrap=n_bootstrap, seed=seed
         )
@@ -60,6 +63,12 @@ class BehavioralAlignmentMetric:
         verdicts: list[JudgeVerdict],
         scale_type: ScaleType = ScaleType.ORDINAL,
     ) -> AgreementResult:
+        """Compute alpha over the verdicts and attach a behavioural interpretation.
+
+        Returns:
+            The ``AgreementResult`` from ``KrippendorffAlpha`` with ``alpha_interpretation`` worded
+            for cross-condition consistency (or ``"insufficient data"``).
+        """
         result = self._alpha_metric.compute(verdicts, scale_type)
         interp = (
             _interpret_behavioral(result.alpha or 0.0)

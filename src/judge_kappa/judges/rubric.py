@@ -29,11 +29,24 @@ _SYSTEM = textwrap.dedent("""\
 
 
 class RubricJudge(LLMJudge):
+    """Scores each rubric dimension 0.0-1.0 (MLflow LLMaJ style); the verdict is the weight-averaged
+    score.
+    """
     def __init__(self, *args: Any, rubric: list[RubricDimension], **kwargs: Any) -> None:
+        """Create a rubric judge.
+
+        Args:
+            rubric: The dimensions to score; other arguments are those of ``LLMJudge``.
+        """
         super().__init__(*args, **kwargs)
         self._rubric = rubric
 
     def judge(self, case: EvalCase, output: str, variant_name: str) -> JudgeVerdict:
+        """Judge one output against the rubric.
+
+        A missing or invalid dimension score is flagged on the verdict and scored 0.0 (or
+        raises, per ``on_parse_failure``).
+        """
         system = _SYSTEM.format(icl_block=self._icl_block())
 
         dims_text = "\n".join(

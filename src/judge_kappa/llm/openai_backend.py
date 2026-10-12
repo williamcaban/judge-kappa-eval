@@ -21,6 +21,11 @@ from judge_kappa.llm.types import LLMResponse, UsageStats, sanitize_url
 
 
 class OpenAIBackend:
+    """Backend for OpenAI-compatible chat-completion servers (OpenAI, vLLM, Ollama, Groq, ...).
+
+    Sends ``temperature`` explicitly, captures token usage, finish reason and latency, and forwards
+    timeout and retry settings to the SDK.
+    """
     def __init__(
         self,
         model: str,
@@ -33,6 +38,22 @@ class OpenAIBackend:
         timeout_s: float | None = None,
         max_retries: int | None = None,
     ) -> None:
+        """Create the backend and its SDK client.
+
+        Args:
+            model: Model id.
+            api_key: API key (None lets the SDK read the environment).
+            base_url: Endpoint override for vLLM, Ollama, OpenRouter, etc.
+            max_tokens: Output cap; sent only when set.
+            max_tokens_param: Wire name of the cap (``max_completion_tokens`` for OpenAI reasoning
+                models).
+            omit_temperature: Never send ``temperature`` (for models that reject it).
+            timeout_s: Per-request timeout; None keeps the SDK default.
+            max_retries: SDK retries for transient errors; None keeps the SDK default.
+
+        Raises:
+            ImportError: If the ``openai`` extra is not installed.
+        """
         try:
             from openai import OpenAI
         except ImportError as exc:
@@ -55,6 +76,7 @@ class OpenAIBackend:
         self._client = OpenAI(**client_kwargs)
 
     def describe(self) -> dict[str, Any]:
+        """Secret-free description of this backend (base URL stripped of credentials)."""
         return {
             "provider": "openai",
             "model": self._model,
@@ -67,11 +89,16 @@ class OpenAIBackend:
         }
 
     def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
+        """Return only the reply text; see ``complete_with_usage``."""
         return self.complete_with_usage(system, user, temperature).text
 
     def complete_with_usage(
         self, system: str, user: str, temperature: float = 0.0
     ) -> LLMResponse:
+        """Send one request and return the reply with its usage metadata.
+
+        Token counts, finish reason, model and latency are also accumulated in ``stats``.
+        """
         kwargs: dict[str, Any] = {
             "model": self._model,
             "messages": [

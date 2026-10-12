@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def validate_max_workers(value: int) -> int:
+    """Return ``value`` if it is an integer >= 1; otherwise raise ``ValueError``."""
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise ValueError("max_workers must be an integer >= 1")
     return value

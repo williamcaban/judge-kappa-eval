@@ -1,3 +1,5 @@
+"""Judge implementations: assertion, rubric, pairwise and listwise ranking judges."""
+
 from judge_kappa.judges.assertion import AssertionJudge
 from judge_kappa.judges.base import LLMJudge
 from judge_kappa.judges.pairwise import PairwiseJudge, PairwiseScore

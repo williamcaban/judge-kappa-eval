@@ -50,6 +50,11 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class BackendConfig(BaseModel):
+    """LLM backend settings: provider, model, endpoint and credentials.
+
+    Also carries the explicit request parameters (``max_tokens``, ``omit_temperature``, timeout,
+    retries) and an optional response cache.
+    """
     provider: Literal["openai", "anthropic"]
     model: str
     base_url: str | None = None        # override for vLLM, Ollama, OpenRouter, etc.
@@ -79,6 +84,7 @@ class BackendConfig(BaseModel):
 
 
 class CalibrationConfig(BaseModel):
+    """One ICL calibration anchor: a human-scored (prompt, output) example."""
     prompt: str
     output: str
     score: float
@@ -92,10 +98,12 @@ class AnchorConfig(BaseModel):
     high: str = ""
 
     def to_list(self) -> list[str]:
+        """The non-empty anchor strings, in low, mid, high order."""
         return [s for s in [self.low, self.mid, self.high] if s]
 
 
 class RubricDimensionConfig(BaseModel):
+    """One rubric dimension with a weight and optional anchors."""
     name: str
     description: str
     weight: float = 1.0
@@ -103,6 +111,9 @@ class RubricDimensionConfig(BaseModel):
 
 
 class JudgeConfig(BaseModel):
+    """One judge in a panel: type, backend, weight, temperature, parse-failure policy, calibration
+    examples and (for rubric judges) the rubric.
+    """
     id: str
     type: Literal["assertion", "rubric"]
     backend: BackendConfig
@@ -116,18 +127,22 @@ class JudgeConfig(BaseModel):
 
     @model_validator(mode="after")
     def rubric_required_for_rubric_judge(self) -> JudgeConfig:
+        """Require at least one rubric dimension when ``type`` is ``rubric``."""
         if self.type == "rubric" and not self.rubric:
             raise ValueError(f"Judge '{self.id}' has type='rubric' but no rubric dimensions defined.")
         return self
 
 
 class PanelConfig(BaseModel):
+    """Panel definition: a homogeneous panel or a diverse jury, its aggregation strategy and judges.
+    """
     type: Literal["panel", "jury"] = "panel"
     strategy: Literal["mean", "weighted_mean", "majority_vote", "median", "trimmed_mean"] = "mean"
     judges: list[JudgeConfig]
 
 
 class VariantConfig(BaseModel):
+    """Control or treatment variant, with an optional per-variant generation backend."""
     name: str
     system_prompt: str | None = None
     skill_context: str | None = None  # auto-loaded from SKILL.md when mode=skill
@@ -145,6 +160,7 @@ class GenerationConfig(BaseModel):
 
 
 class PositionalJudgeConfig(BaseModel):
+    """Pairwise judge used for the positional swap test and for pairwise mode."""
     id: str
     backend: BackendConfig
     temperature: float = 0.0
@@ -153,6 +169,9 @@ class PositionalJudgeConfig(BaseModel):
 
 
 class OutputConfig(BaseModel):
+    """Report output: format (text, json, jsonl), destination file, and whether to include per-judge
+    verdicts.
+    """
     format: Literal["json", "text", "jsonl"] = "text"
     file: str | None = None           # if None, writes to stdout
     include_verdicts: bool = False        # include per-judge per-case verdict detail
@@ -162,6 +181,7 @@ class OutputConfig(BaseModel):
 
 
 class SkillModeConfig(BaseModel):
+    """Config for evaluating a skill directory (``SKILL.md`` + evals.json)."""
     mode: Literal["skill"]
     skill_dir: str
     generation: GenerationConfig
@@ -176,6 +196,7 @@ class SkillModeConfig(BaseModel):
 
 
 class DatasetModeConfig(BaseModel):
+    """Config for evaluating a JSONL dataset whose rows carry pre-recorded outputs."""
     mode: Literal["dataset"]
     dataset_file: str                    # path to JSONL file
     generation: GenerationConfig
@@ -191,6 +212,7 @@ class DatasetModeConfig(BaseModel):
 
 
 class PairwiseModeConfig(BaseModel):
+    """Config for scoring pre-recorded A/B output pairs with a pairwise judge."""
     mode: Literal["pairwise"]
     dataset_file: str                    # path to JSONL with output_a / output_b fields
     generation: GenerationConfig         # required by schema; not called in pairwise mode

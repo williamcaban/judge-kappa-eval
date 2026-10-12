@@ -24,6 +24,11 @@ DEFAULT_MAX_TOKENS = 2048
 
 
 class AnthropicBackend:
+    """Backend for the Anthropic Messages API.
+
+    Sends ``temperature`` and ``max_tokens`` explicitly, captures token usage, finish reason and
+    latency, and forwards timeout and retry settings to the SDK.
+    """
     def __init__(
         self,
         model: str,
@@ -34,6 +39,19 @@ class AnthropicBackend:
         timeout_s: float | None = None,
         max_retries: int | None = None,
     ) -> None:
+        """Create the backend and its SDK client.
+
+        Args:
+            model: Model id.
+            api_key: API key (None lets the SDK read the environment).
+            max_tokens: Output cap; required by the API (default 2048).
+            omit_temperature: Never send ``temperature`` (for models that reject it).
+            timeout_s: Per-request timeout; None keeps the SDK default.
+            max_retries: SDK retries for transient errors; None keeps the SDK default.
+
+        Raises:
+            ImportError: If the ``anthropic`` extra is not installed.
+        """
         try:
             import anthropic
         except ImportError as exc:
@@ -54,6 +72,7 @@ class AnthropicBackend:
         self._client = anthropic.Anthropic(**client_kwargs)
 
     def describe(self) -> dict[str, Any]:
+        """Secret-free description of this backend, for provenance and cache keys."""
         return {
             "provider": "anthropic",
             "model": self._model,
@@ -65,11 +84,16 @@ class AnthropicBackend:
         }
 
     def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
+        """Return only the reply text; see ``complete_with_usage``."""
         return self.complete_with_usage(system, user, temperature).text
 
     def complete_with_usage(
         self, system: str, user: str, temperature: float = 0.0
     ) -> LLMResponse:
+        """Send one request and return the reply with its usage metadata.
+
+        Token counts, finish reason, model and latency are also accumulated in ``stats``.
+        """
         kwargs: dict[str, Any] = {
             "model": self._model,
             "max_tokens": self._max_tokens,

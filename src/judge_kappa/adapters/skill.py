@@ -14,7 +14,18 @@ from judge_kappa.models import Assertion, EvalCase
 
 
 class SkillAdapter(InputAdapter):
+    """Adapter for agent-skills-eval skill directories (``SKILL.md`` + ``evals/evals.json``)."""
     def load(self, source: object) -> list[EvalCase]:
+        """Load only the eval cases from a skill directory.
+
+        Use ``load_with_context()`` when the ``SKILL.md`` text is needed as well.
+
+        Args:
+            source: Path to the skill directory.
+
+        Returns:
+            The ``EvalCase`` list built from ``evals/evals.json``.
+        """
         skill_dir, _ = self.load_with_context(source)  # type: ignore[arg-type]
         return skill_dir
 

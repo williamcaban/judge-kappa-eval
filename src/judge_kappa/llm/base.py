@@ -38,6 +38,7 @@ class UsageAwareBackend(Protocol):
     def complete_with_usage(
         self, system: str, user: str, temperature: float = 0.0
     ) -> LLMResponse:
+        """Return the reply together with token usage, finish reason and latency."""
         ...
 
 

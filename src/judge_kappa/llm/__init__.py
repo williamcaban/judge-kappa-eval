@@ -1,3 +1,5 @@
+"""LLM backends and response types: OpenAI-compatible, Anthropic, and a response cache."""
+
 from judge_kappa.llm.anthropic_backend import AnthropicBackend
 from judge_kappa.llm.base import (
     LLMBackend,

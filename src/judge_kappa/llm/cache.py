@@ -39,6 +39,11 @@ _FORMAT_VERSION = 1
 
 
 class CachedBackend:
+    """Persistent response cache around any backend (see the module docstring).
+
+    Concurrent identical requests make a single model call; the others wait for and reuse its
+    reply or its failure.
+    """
     def __init__(
         self,
         inner: LLMBackend,
@@ -75,16 +80,20 @@ class CachedBackend:
 
     @property
     def inner(self) -> LLMBackend:
+        """The wrapped backend."""
         return self._inner
 
     @property
     def path(self) -> Path:
+        """Path of the JSONL cache file."""
         return self._path
 
     def __len__(self) -> int:
+        """Number of cached replies."""
         return len(self._entries)
 
     def describe(self) -> dict[str, Any]:
+        """Wrapped backend's description plus ``cached``, ``cache_file`` (name only), entries."""
         d = dict(describe_backend(self._inner))
         d["cached"] = True
         d["cache_file"] = self._path.name       # name only: do not leak local directory layout
@@ -94,11 +103,17 @@ class CachedBackend:
     # ── backend protocol ──────────────────────────────────────────────────────
 
     def complete(self, system: str, user: str, temperature: float = 0.0) -> str:
+        """Return only the reply text; see ``complete_with_usage``."""
         return self.complete_with_usage(system, user, temperature).text
 
     def complete_with_usage(
         self, system: str, user: str, temperature: float = 0.0
     ) -> LLMResponse:
+        """Serve the reply from the cache, or call the backend once and store the result.
+
+        Cache hits (including waiters on an in-flight identical request) are returned with
+        ``cached=True``; failures are never cached.
+        """
         key = self._key(system, user, temperature)
         waiting_on: Future[LLMResponse] | None = None
         leader_future: Future[LLMResponse] | None = None
@@ -141,6 +156,7 @@ class CachedBackend:
     # ── persistence ───────────────────────────────────────────────────────────
 
     def _key(self, system: str, user: str, temperature: float) -> str:
+        """SHA-256 over the backend description, namespace, prompts and temperature."""
         desc = {k: v for k, v in describe_backend(self._inner).items() if k not in _VOLATILE_KEYS}
         payload = json.dumps(
             {"b": desc, "ns": self._namespace, "s": system, "u": user, "t": float(temperature)},
@@ -149,6 +165,7 @@ class CachedBackend:
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def _load(self) -> None:
+        """Read existing records, skipping any line a crash left incomplete or malformed."""
         if not self._path.exists():
             return
         with self._path.open(encoding="utf-8") as fh:
@@ -170,6 +187,7 @@ class CachedBackend:
                     self.skipped_lines += 1     # e.g. a line cut short by a crash
 
     def _store(self, key: str, resp: LLMResponse) -> None:
+        """Record a reply in memory and append it to the file as one whole line."""
         record = {
             "v": _FORMAT_VERSION,
             "key": key,

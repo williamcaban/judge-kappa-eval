@@ -56,6 +56,7 @@ from judge_kappa.ranking.btl import ELO_SCALE, ComparisonGame, bootstrap_btl, fi
 
 @dataclass
 class PairResult:
+    """Head-to-head summary for one system pair: preference/tie rates, mean scores, bias rate."""
     system_a: str
     system_b: str
     preference_rate_a: float   # fraction of cases A won
@@ -68,6 +69,7 @@ class PairResult:
 
 @dataclass
 class TournamentStanding:
+    """One system's standing: rating, wins, losses, ties, win rate and BTL score with interval."""
     system: str
     elo: float
     wins: int
@@ -82,6 +84,11 @@ class TournamentStanding:
 
 @dataclass
 class TournamentReport:
+    """Result of a tournament.
+
+    Standings, per-pair results, the win matrix, the judge's order effect, data quality and run
+    provenance.
+    """
     standings: list[TournamentStanding]   # sorted by Elo descending
     pair_results: list[PairResult]
     win_matrix: dict[str, dict[str, float]]   # win_matrix[a][b] = rate A beat B
@@ -99,6 +106,7 @@ class TournamentReport:
     run: RunMetadata | None = None   # provenance: configuration, versions and usage
 
     def print_leaderboard(self) -> None:
+        """Print the ranked table with confidence intervals, the order effect and warnings."""
         has_ci = any(s.btl_ci_low is not None for s in self.standings)
         ci_head = f" {f'{self.ci_level:.0%} CI (Elo)' if self.ci_level else 'CI (Elo)':>18}" if has_ci else ""
         print(f"{'Rank':<5} {'System':<30} {'Elo':>7} {'Win%':>6} {'W':>4} {'L':>4} {'T':>4}{ci_head}")
@@ -241,6 +249,7 @@ class TournamentEvaluator:
         exclude_parse_failures: bool = False,
         max_workers: int = 1,
     ) -> None:
+        """Configure the tournament; see the class docstring for each argument."""
         if rating_method not in ("btl", "elo"):
             raise ValueError("rating_method must be 'btl' or 'elo'")
         if n_bootstrap < 0 or n_bootstrap == 1:

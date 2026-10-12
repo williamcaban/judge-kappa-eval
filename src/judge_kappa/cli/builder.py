@@ -74,6 +74,7 @@ def _resolve_api_key(api_key_env: str | None, provider: str) -> str | None:
 
 
 def _build_backend(cfg: BackendConfig) -> LLMBackend:
+    """Build the configured backend, wrapped in a ``CachedBackend`` when ``cache_path`` is set."""
     backend = _build_raw_backend(cfg)
     if cfg.cache_path:
         return CachedBackend(backend, cfg.cache_path)
@@ -81,6 +82,7 @@ def _build_backend(cfg: BackendConfig) -> LLMBackend:
 
 
 def _build_raw_backend(cfg: BackendConfig) -> LLMBackend:
+    """Construct the Anthropic or OpenAI-compatible backend from config, without caching."""
     api_key = _resolve_api_key(cfg.api_key_env, cfg.provider)
     if cfg.provider == "anthropic":
         anthropic_kwargs: dict[str, object] = {
@@ -104,10 +106,12 @@ def _build_raw_backend(cfg: BackendConfig) -> LLMBackend:
 
 
 def _build_calibration(items: list[CalibrationConfig]) -> list[CalibrationExample]:
+    """Convert calibration config entries into ``CalibrationExample``s."""
     return [CalibrationExample(**c.model_dump()) for c in items]
 
 
 def _build_rubric(dims: list[RubricDimensionConfig]) -> list[RubricDimension]:
+    """Convert rubric dimension configs (with optional anchors) into ``RubricDimension``s."""
     result = []
     for d in dims:
         anchors = d.anchors.to_list() if d.anchors else []
@@ -118,6 +122,7 @@ def _build_rubric(dims: list[RubricDimensionConfig]) -> list[RubricDimension]:
 
 
 def _build_judge(cfg: JudgeConfig) -> LLMJudge:
+    """Build an ``AssertionJudge`` or ``RubricJudge`` from a judge config."""
     backend = _build_backend(cfg.backend)
     cal = _build_calibration(cfg.calibration)
     if cfg.type == "rubric":
@@ -135,6 +140,9 @@ def _build_judge(cfg: JudgeConfig) -> LLMJudge:
 
 
 def _build_panel(cfg: PanelConfig) -> JudgeJury | JudgePanel:
+    """Build a ``JudgePanel`` or ``JudgeJury`` (per ``cfg.type``) with the configured aggregation
+    strategy and weights.
+    """
     judges = [_build_judge(j) for j in cfg.judges]
     strategy = AggregationStrategy(cfg.strategy)
     if cfg.type == "jury":
@@ -145,6 +153,7 @@ def _build_panel(cfg: PanelConfig) -> JudgeJury | JudgePanel:
 
 
 def _build_positional_judge(cfg: PositionalJudgeConfig) -> PairwiseJudge:
+    """Build the ``PairwiseJudge`` used for the positional-bias swap test."""
     backend = _build_backend(cfg.backend)
     cal = _build_calibration(cfg.calibration)
     return PairwiseJudge(
@@ -155,6 +164,8 @@ def _build_positional_judge(cfg: PositionalJudgeConfig) -> PairwiseJudge:
 
 
 def _build_variant(cfg: VariantConfig, skill_md: str | None = None) -> Variant:
+    """Build a ``Variant``, giving the treatment the ``SKILL.md`` context when the config sets none.
+    """
     per_variant_backend = (
         _build_backend(cfg.generation.backend) if cfg.generation else None
     )
@@ -169,6 +180,11 @@ def _build_variant(cfg: VariantConfig, skill_md: str | None = None) -> Variant:
 
 
 def build_evaluator(config: SkillModeConfig | DatasetModeConfig) -> JuryEvaluator:
+    """Build a ``JuryEvaluator`` from a skill- or dataset-mode config.
+
+    Wires the panel, the generation backend, the optional positional judge, the verbosity
+    threshold and ``max_workers``.
+    """
     panel = _build_panel(config.panel)
     gen_backend = _build_backend(config.generation.backend)
     pairwise = (
