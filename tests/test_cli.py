@@ -312,3 +312,89 @@ class TestBackendRequestParameters:
         assert "max_tokens" not in seen            # backend default (2048) applies
         builder._build_backend(BackendConfig(provider="anthropic", model="claude-x", max_tokens=900))
         assert seen["max_tokens"] == 900
+
+
+# ── Text report: optional metrics ─────────────────────────────────────────────
+
+
+class _ScoreBackend:
+    """Judge backend that always scores the single assertion ``A`` with a fixed value."""
+
+    def __init__(self, score: float) -> None:
+        self._score = score
+
+    def complete(self, system: str, user: str, temperature: float = 0.0) -> str:  # noqa: ARG002
+        return json.dumps({"assertion_scores": {"A": self._score}, "rationale": "ok"})
+
+
+def _report(n_cases: int, scores: list[float]):
+    """A real EvalReport from one judge per entry of ``scores``."""
+    from judge_kappa.evaluator import JuryEvaluator
+    from judge_kappa.judges.assertion import AssertionJudge
+    from judge_kappa.models import Assertion, EvalCase, Variant
+    from judge_kappa.panel.panel import JudgePanel
+
+    judges = [AssertionJudge(f"j{i}", _ScoreBackend(sc)) for i, sc in enumerate(scores)]
+    ev = JuryEvaluator(
+        panel=JudgePanel(judges), generation_backend=_ScoreBackend(1.0),
+        compute_significance=False, bootstrap_ci=False,
+    )
+    cases = [
+        EvalCase(id=f"c{i}", prompt="Q", assertions=[Assertion(text="A")]) for i in range(n_cases)
+    ]
+    return ev.evaluate(
+        cases,
+        Variant(name="control", predict_fn=lambda _: "short"),
+        Variant(name="treatment", predict_fn=lambda _: "a rather longer output"),
+    )
+
+
+def _line(text: str, label: str) -> str:
+    return next(line.strip() for line in text.splitlines() if line.strip().startswith(label))
+
+
+class TestTextReportOptionalMetrics:
+    """Regression: the text report formatted optional metrics with :.4f and raised TypeError."""
+
+    @pytest.mark.parametrize(
+        ("n_cases", "scores"),
+        [
+            (4, [0.8]),          # a single judge: no pair to compare
+            (1, [0.8, 0.8]),     # two judges but no pair shares 2 cases
+            (1, [0.2, 0.9]),
+        ],
+    )
+    def test_renders_without_a_judge_pair(self, n_cases, scores):
+        from judge_kappa.cli.main import _render_text
+
+        text = _render_text(_report(n_cases, scores))
+        assert "n/a (needs at least 2 judges and 2 shared cases)" in _line(text, "Cohen κ")
+        assert "n/a (needs at least 2 judges and 2 shared cases)" in _line(text, "Expected P(e)")
+
+    def test_single_judge_does_not_claim_perfect_agreement(self):
+        from judge_kappa.cli.main import _render_text
+
+        report = _report(4, [0.8])
+        assert report.agreement.n_judges == 1
+        text = _render_text(report)
+        alpha_line = _line(text, "Krippendorff α")
+        assert "n/a (needs at least 2 judges)" in alpha_line
+        assert "1.0000" not in alpha_line
+
+    def test_identical_scores_are_undefined_not_nan(self):
+        from judge_kappa.cli.main import _render_text
+
+        text = _render_text(_report(4, [0.8, 0.8]))
+        assert "undefined (scores do not vary)" in _line(text, "Cohen κ")
+        assert "nan" not in text.lower()
+
+    def test_ordinary_numeric_output_is_unchanged(self):
+        from judge_kappa.cli.main import _render_text
+
+        report = _report(4, [0.2, 0.9])
+        text = _render_text(report)
+        assert _line(text, "Krippendorff α").startswith("Krippendorff α:   -0.7500")
+        assert _line(text, "Cohen κ") == "Cohen κ (mean):   0.0000"
+        assert _line(text, "Expected P(e)") == "Expected P(e):    0.0000"
+        assert "n/a" not in text
+
