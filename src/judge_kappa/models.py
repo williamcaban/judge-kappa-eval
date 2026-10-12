@@ -211,6 +211,10 @@ class BiasResult(BaseModel):
     verbosity_bias_rho: float | None = None  # Spearman ρ(length, score)
     verbosity_bias_p: float | None = None
     verbosity_biased: bool = False
+    # Verdicts with a measured output length (output_token_count > 0) used in the correlation,
+    # and verdicts left out because no length was recorded.
+    verbosity_n_measured: int = 0
+    verbosity_n_unmeasured: int = 0
 
 
 class UpliftSignificance(BaseModel):

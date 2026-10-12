@@ -388,3 +388,32 @@ class TestMcNemarSignificance:
         assert sig.mcnemar_statistic == 0.0
         assert sig.p_value == 1.0
         assert sig.significant is False
+
+
+class TestVerbosityLengthReporting:
+    """Verdicts with no measured output length are reported, not silently re-measured."""
+
+    @staticmethod
+    def _run(output: str):
+        cases = [_make_case(f"c{i}", ["A"]) for i in range(4)]
+        ev, _ = _make_evaluator([_assertion_resp({"A": 1.0})])
+        ctrl = Variant(name="control",   predict_fn=lambda _: output)
+        trt  = Variant(name="treatment", predict_fn=lambda _: output)
+        return ev.evaluate(cases, ctrl, trt)
+
+    def test_empty_outputs_are_reported_as_unmeasured(self):
+        report = self._run("")
+        # 4 cases x 2 variants x 2 judges
+        assert report.bias.verbosity_n_measured == 0
+        assert report.bias.verbosity_n_unmeasured == 16
+        assert report.bias.verbosity_bias_rho is None
+        warnings = [w for w in report.data_quality.warnings if "output length" in w]
+        assert len(warnings) == 1
+        assert "16 of 16 verdicts" in warnings[0] and "not estimated" in warnings[0]
+
+    def test_measured_outputs_raise_no_length_warning(self):
+        report = self._run("three word output")
+        assert report.bias.verbosity_n_measured == 16
+        assert report.bias.verbosity_n_unmeasured == 0
+        assert not [w for w in report.data_quality.warnings if "output length" in w]
+

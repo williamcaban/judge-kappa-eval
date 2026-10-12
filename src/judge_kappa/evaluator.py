@@ -510,6 +510,8 @@ class JuryEvaluator:
             verbosity_bias_rho=verb_bias.verbosity_bias_rho,
             verbosity_bias_p=verb_bias.verbosity_bias_p,
             verbosity_biased=verb_bias.verbosity_biased,
+            verbosity_n_measured=verb_bias.verbosity_n_measured,
+            verbosity_n_unmeasured=verb_bias.verbosity_n_unmeasured,
         )
 
         # McNemar significance test + bootstrap CI for mean uplift
@@ -531,8 +533,23 @@ class JuryEvaluator:
             replies += [
                 (self._positional_judge.judge_id, r.parse_error, r.truncated) for r in pos_reports
             ]
+        length_warnings: list[str] = []
+        if verb_bias.verbosity_n_unmeasured:
+            length_warnings.append(
+                f"{verb_bias.verbosity_n_unmeasured} of {len(all_verdicts)} verdicts have no "
+                "output length (output_token_count == 0) and were left out of the "
+                f"verbosity-bias correlation ({verb_bias.verbosity_n_measured} measured)"
+                + (
+                    "; too few remain, so verbosity bias was not estimated."
+                    if verb_bias.verbosity_bias_rho is None
+                    else "."
+                )
+                + " Built-in judges set the length; custom judges must set output_token_count."
+            )
         data_quality = compute_data_quality(
-            replies, extra_truncated=generation_truncations(run_state)
+            replies,
+            extra_truncated=generation_truncations(run_state),
+            extra_warnings=length_warnings,
         )
         run_metadata = end_run(run_state, settings={
             "mode": "ab_evaluation",

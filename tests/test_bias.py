@@ -14,7 +14,7 @@ import pytest
 from judge_kappa.bias.positional import PositionalBiasDetector, PositionalBiasReport
 from judge_kappa.bias.verbosity import VerbosityBiasDetector
 from judge_kappa.judges.pairwise import PairwiseJudge
-from judge_kappa.models import BiasResult, EvalCase
+from judge_kappa.models import BiasResult, EvalCase, JudgeVerdict
 from tests.conftest import MockLLMBackend, make_verdict
 
 
@@ -197,3 +197,90 @@ class TestVerbosityBiasDetector:
         result = VerbosityBiasDetector().detect(verdicts=verdicts)
         assert result.verbosity_bias_rho is not None
         assert result.verbosity_bias_p is not None
+
+
+class TestVerbosityLengthSemantics:
+    """Length comes from output_token_count only; unmeasured verdicts are excluded and counted."""
+
+    @staticmethod
+    def _verdict(case_id: str, score: float, tokens: int, rationale: str = "r") -> JudgeVerdict:
+        return JudgeVerdict(
+            judge_id="j1", eval_case_id=case_id, variant_name="treatment",
+            score=score, rationale=rationale, output_token_count=tokens,
+        )
+
+    def test_rationale_length_is_never_used_as_output_length(self):
+        # Score rises perfectly with the length of the judge's RATIONALE, but no output length
+        # was recorded. The old fallback reported rho=1.0 / biased=True; there is nothing to
+        # estimate, so no verdict must be produced.
+        verdicts = [
+            self._verdict(f"c{i}", score=i / 10, tokens=0, rationale="word " * i)
+            for i in range(1, 11)
+        ]
+        result = VerbosityBiasDetector().detect(verdicts=verdicts)
+        assert result.verbosity_bias_rho is None
+        assert result.verbosity_bias_p is None
+        assert result.verbosity_biased is False
+        assert result.verbosity_n_measured == 0
+        assert result.verbosity_n_unmeasured == 10
+
+    def test_unmeasured_verdicts_are_excluded_and_counted(self):
+        measured = [self._verdict(f"m{i}", score=i / 10, tokens=i * 20) for i in range(1, 9)]
+        unmeasured = [
+            self._verdict(f"u{i}", score=0.0, tokens=0, rationale="x " * (50 - i))
+            for i in range(4)
+        ]
+        mixed = VerbosityBiasDetector().detect(verdicts=measured + unmeasured)
+        clean = VerbosityBiasDetector().detect(verdicts=measured)
+        assert mixed.verbosity_n_measured == 8
+        assert mixed.verbosity_n_unmeasured == 4
+        # The unmeasured verdicts (score 0.0) must not move the estimate at all.
+        assert mixed.verbosity_bias_rho == clean.verbosity_bias_rho
+        assert mixed.verbosity_bias_p == clean.verbosity_bias_p
+
+    def test_fewer_than_three_measured_reports_counts_without_estimate(self):
+        verdicts = [self._verdict("a", 0.9, 10), self._verdict("b", 0.1, 90)] + [
+            self._verdict(f"u{i}", 0.5, 0) for i in range(5)
+        ]
+        result = VerbosityBiasDetector().detect(verdicts=verdicts)
+        assert result.verbosity_bias_rho is None
+        assert (result.verbosity_n_measured, result.verbosity_n_unmeasured) == (2, 5)
+
+    def test_all_measured_reports_zero_unmeasured(self):
+        verdicts = [make_verdict("j1", f"c{i}", i / 10, token_count=i * 10) for i in range(1, 8)]
+        result = VerbosityBiasDetector().detect(verdicts=verdicts)
+        assert (result.verbosity_n_measured, result.verbosity_n_unmeasured) == (7, 0)
+
+    def test_tiktoken_encoding_is_deprecated_and_ignored(self):
+        verdicts = [make_verdict("j1", f"c{i}", i / 10, token_count=i * 20) for i in range(1, 11)]
+        baseline = VerbosityBiasDetector().detect(verdicts=verdicts)
+        with pytest.warns(DeprecationWarning, match="tiktoken_encoding"):
+            detector = VerbosityBiasDetector(tiktoken_encoding="o200k_base")
+        assert detector.detect(verdicts=verdicts) == baseline
+
+    def test_default_construction_does_not_warn(self):
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            VerbosityBiasDetector()
+            VerbosityBiasDetector(0.25)
+            VerbosityBiasDetector(threshold=0.25)
+
+    def test_tiktoken_is_not_imported_by_the_library(self):
+        # The extra is a no-op: the library must not import tiktoken, or the docs would again
+        # promise something the code does not do.
+        import pathlib
+
+        import judge_kappa
+
+        root = pathlib.Path(judge_kappa.__file__).parent
+        offenders = [
+            str(p.relative_to(root))
+            for p in root.rglob("*.py")
+            if any(
+                line.lstrip().startswith(("import tiktoken", "from tiktoken"))
+                for line in p.read_text(encoding="utf-8").splitlines()
+            )
+        ]
+        assert offenders == []
