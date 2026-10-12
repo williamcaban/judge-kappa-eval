@@ -120,13 +120,33 @@ class TestJuryEvaluatorEvaluate:
 
     def test_agreement_fields_populated(self):
         cases = [_make_case(f"c{i}", ["A"]) for i in range(3)]
-        ev, _ = _make_evaluator([_assertion_resp({"A": 0.8})], n_judges=2)
+        # Scores that vary across cases (the three replies cycle control/treatment per case,
+        # so the treatment score differs on every case), so alpha and kappa are both estimated.
+        ev, _ = _make_evaluator(
+            [_assertion_resp({"A": 0.2}), _assertion_resp({"A": 0.5}), _assertion_resp({"A": 0.9})],
+            n_judges=2,
+        )
         ctrl = Variant(name="control",   predict_fn=lambda _: "ctrl")
         trt  = Variant(name="treatment", predict_fn=lambda _: "trt")
         report = ev.evaluate(cases, ctrl, trt)
         assert report.agreement.alpha is not None
         assert report.agreement.kappa is not None
+        assert report.agreement.alpha_not_estimated_reason is None
+        assert report.agreement.kappa_not_estimated_reason is None
         assert report.agreement.n_judges == 2
+
+    def test_single_judge_agreement_is_reported_as_not_estimated(self):
+        cases = [_make_case(f"c{i}", ["A"]) for i in range(3)]
+        ev, _ = _make_evaluator([_assertion_resp({"A": 0.8})], n_judges=1)
+        ctrl = Variant(name="control",   predict_fn=lambda _: "ctrl")
+        trt  = Variant(name="treatment", predict_fn=lambda _: "trt")
+        report = ev.evaluate(cases, ctrl, trt)
+        a = report.agreement
+        assert a.alpha is None and a.alpha_not_estimated_reason == "single_judge"
+        assert a.kappa is None and a.kappa_not_estimated_reason == "no_judge_pair"
+        assert all(c.agreement.alpha is None for c in report.cases)
+        payload = json.loads(report.model_dump_json())["agreement"]
+        assert payload["alpha"] is None and payload["kappa"] is None
 
     def test_bias_fields_populated(self):
         cases = [_make_case(f"c{i}", ["A"]) for i in range(4)]

@@ -12,6 +12,10 @@ Tests verify key statistical invariants:
 
 from __future__ import annotations
 
+import json
+import math
+import warnings
+
 import pytest
 
 from judge_kappa.agreement.alpha import KrippendorffAlpha, _interpret
@@ -223,3 +227,124 @@ class TestCohenKappa:
         result = CohenKappa().compute(v, ScaleType.NOMINAL)
         assert result.kappa == pytest.approx(0.5455, abs=0.0001)
         assert result.expected_chance_agreement == pytest.approx(0.34, abs=0.0001)
+
+
+# ── Undefined agreement: report None and why, never a misleading 1.0 or NaN ──────
+
+
+class TestUndefinedAlpha:
+    """Alpha compares values given to one case by different judges; without that it is undefined."""
+
+    @pytest.mark.parametrize("scores", [
+        {"c1": 0.1, "c2": 0.5, "c3": 0.9, "c4": 0.3},      # varied
+        {"c1": 0.8, "c2": 0.8, "c3": 0.8, "c4": 0.8},      # constant
+    ])
+    def test_single_judge_is_not_estimated(self, scores):
+        result = KrippendorffAlpha().compute(_verdicts({"j1": scores}), ScaleType.ORDINAL)
+        assert result.alpha is None
+        assert result.alpha_not_estimated_reason == "single_judge"
+        assert result.alpha_interpretation is None
+        assert result.alpha_ci_low is None and result.alpha_ci_high is None
+        assert result.n_judges == 1
+
+    def test_judges_with_disjoint_cases_are_not_estimated(self):
+        # Previously reported alpha = 1.0 ("strong agreement"): nobody compared anything.
+        v = _verdicts({
+            "j1": {"c1": 0.1, "c2": 0.5},
+            "j2": {"c3": 0.9, "c4": 0.3},
+        })
+        result = KrippendorffAlpha().compute(v, ScaleType.ORDINAL)
+        assert result.alpha is None
+        assert result.alpha_not_estimated_reason == "no_pairable_values"
+        assert result.n_judges == 2
+
+    def test_identical_constant_scores_keep_the_documented_convention(self):
+        v = _verdicts({
+            "j1": {"c1": 0.8, "c2": 0.8, "c3": 0.8},
+            "j2": {"c1": 0.8, "c2": 0.8, "c3": 0.8},
+        })
+        result = KrippendorffAlpha().compute(v, ScaleType.ORDINAL)
+        assert result.alpha == 1.0
+        assert result.alpha_not_estimated_reason is None
+
+    def test_one_shared_case_is_enough_to_estimate(self):
+        v = _verdicts({
+            "j1": {"c1": 0.1, "c2": 0.5},
+            "j2": {"c1": 0.2, "c3": 0.9},
+        })
+        result = KrippendorffAlpha().compute(v, ScaleType.ORDINAL)
+        assert result.alpha is not None
+        assert result.alpha_not_estimated_reason is None
+
+    def test_no_verdicts_is_not_estimated(self):
+        result = KrippendorffAlpha().compute([], ScaleType.ORDINAL)
+        assert result.alpha is None
+        assert result.alpha_not_estimated_reason == "single_judge"
+
+
+class TestUndefinedKappa:
+    @staticmethod
+    def _compute(by_judge):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")      # no sklearn UserWarning / UndefinedMetricWarning
+            return CohenKappa().compute(_verdicts(by_judge), ScaleType.ORDINAL)
+
+    def test_identical_single_score_is_not_estimated_not_nan(self):
+        r = self._compute({
+            "j1": {"c1": 0.5, "c2": 0.5, "c3": 0.5},
+            "j2": {"c1": 0.5, "c2": 0.5, "c3": 0.5},
+        })
+        assert r.kappa is None
+        assert r.kappa_not_estimated_reason == "no_score_variation"
+        assert r.expected_chance_agreement == 1.0
+        dumped = r.model_dump()
+        assert not any(isinstance(v, float) and math.isnan(v) for v in dumped.values())
+        assert json.loads(r.model_dump_json())["kappa"] is None
+
+    def test_different_constant_scores_are_defined(self):
+        # Each judge uses one category but not the same one: kappa is 0, not undefined.
+        r = self._compute({
+            "j1": {"c1": 0.1, "c2": 0.1, "c3": 0.1},
+            "j2": {"c1": 0.9, "c2": 0.9, "c3": 0.9},
+        })
+        assert r.kappa == pytest.approx(0.0)
+        assert r.kappa_not_estimated_reason is None
+
+    def test_one_constant_one_varied_is_defined(self):
+        r = self._compute({
+            "j1": {"c1": 0.5, "c2": 0.5, "c3": 0.5, "c4": 0.5},
+            "j2": {"c1": 0.1, "c2": 0.5, "c3": 0.9, "c4": 0.5},
+        })
+        assert r.kappa is not None
+        assert r.kappa_not_estimated_reason is None
+
+    def test_single_judge_has_no_pair(self):
+        r = self._compute({"j1": {"c1": 0.1, "c2": 0.9, "c3": 0.5}})
+        assert r.kappa is None and r.expected_chance_agreement is None
+        assert r.kappa_not_estimated_reason == "no_judge_pair"
+
+    def test_judges_sharing_fewer_than_two_cases_have_no_pair(self):
+        r = self._compute({"j1": {"c1": 0.1, "c2": 0.5}, "j2": {"c1": 0.2, "c3": 0.9}})
+        assert r.kappa is None
+        assert r.kappa_not_estimated_reason == "no_judge_pair"
+
+    def test_one_degenerate_pair_makes_the_mean_undefined(self):
+        # j1 and j2 are constant and identical: that pair's kappa is 0/0, so the mean over
+        # pairs is undefined. This replaces the NaN the mean used to propagate.
+        r = self._compute({
+            "j1": {"c1": 0.5, "c2": 0.5, "c3": 0.5},
+            "j2": {"c1": 0.5, "c2": 0.5, "c3": 0.5},
+            "j3": {"c1": 0.1, "c2": 0.5, "c3": 0.9},
+        })
+        assert r.kappa is None
+        assert r.kappa_not_estimated_reason == "no_score_variation"
+        assert r.expected_chance_agreement is not None
+
+    def test_ordinary_agreement_is_unchanged(self):
+        r = self._compute({
+            "j1": {"c1": 0.9, "c2": 0.1, "c3": 0.5},
+            "j2": {"c1": 0.9, "c2": 0.1, "c3": 0.5},
+        })
+        assert r.kappa == pytest.approx(1.0)
+        assert r.kappa_not_estimated_reason is None
+
