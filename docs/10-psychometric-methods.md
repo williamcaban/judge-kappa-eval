@@ -68,6 +68,31 @@ print(result.alpha_interpretation)
 
 Bootstrap resamples cases (columns of the reliability matrix), not judges, which is the correct unit of observation for Krippendorff.
 
+### When agreement cannot be estimated
+
+`agreement.alpha`, `agreement.kappa` and `agreement.icc` are `None` (never `NaN`, and never a made-up `0.0` or `1.0`) when they are undefined, and a reason field says why:
+
+| Field | Reason | Meaning |
+|---|---|---|
+| `alpha_not_estimated_reason` | `single_judge` | Fewer than 2 judges scored anything. Alpha compares values that different judges gave to the same case |
+| | `no_pairable_values` | 2 or more judges, but no case was scored by 2 or more of them (disjoint coverage) |
+| | `no_score_variation` | Every score is the same value, so observed and expected disagreement are both 0 and alpha is 0/0 |
+| `kappa_not_estimated_reason` | `no_judge_pair` | No two judges share at least 2 cases |
+| | `no_score_variation` | A compared pair used one and the same single score, so observed and expected agreement are both 1 and kappa is 0/0. `expected_chance_agreement` is still reported |
+| `icc_not_estimated_reason` | `insufficient_data` | Fewer than 2 judges or 2 cases |
+| | `no_score_variation` | Every score is the same value, so all variance components are 0 |
+
+**Identical scores are undefined for all three statistics.** Judges that never vary have not shown that they agree on anything: "every judge said 0.8 on every case" says nothing about whether they would discriminate between a good and a bad output. Agreement *with* score variation is unaffected, and still gives `1.0`.
+
+Notes:
+
+- **`kappa` is the mean over judge pairs.** If any compared pair is undefined the mean is undefined, so `kappa` is `None` even when other pairs are fine.
+- **Per case.** `case.agreement.alpha` is computed over a single case, so a case on which the judges agree exactly now has `alpha = None` (it used to be `1.0`), and a case on which they disagree has `0.0` or below.
+- **`compute_icc()` itself is unchanged.** Called directly it still returns the `(0.0, "insufficient data")` and `(1.0, ...)` tuples it always did; the report layer (`EvalReport.agreement`) is where undefined values become `None`.
+- **Behavioural alignment** (`BehavioralAlignmentMetric`) follows alpha: a model that gives one identical score under every condition gets `alpha = None` and the interpretation `not estimated: judges used one and the same single score`.
+
+Earlier releases reported `alpha = 1.0` ("strong agreement") for a single judge, for judges with disjoint cases and for judges that gave identical scores; `kappa = NaN` in Python (`null` in JSON) for identical single scores; and `icc = 1.0` ("excellent reliability") or `0.0` for those same inputs. Code that formats these values (`f"{report.agreement.alpha:.3f}"`) now has to handle `None`. The CLI text report prints `n/a (<reason>)`.
+
 ---
 
 ## 2 — ICC(2,k) variance decomposition

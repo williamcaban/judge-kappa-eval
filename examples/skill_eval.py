@@ -106,9 +106,14 @@ print(f"Control score:        {report.mean_control_score:.3f}")
 print(f"Treatment score:      {report.mean_treatment_score:.3f}")
 print()
 print(f"Inter-rater agreement (corpus):")
-print(f"  Krippendorff's α:   {report.agreement.alpha:.3f}  → {report.agreement.alpha_interpretation}")
-print(f"  Cohen's κ (mean):   {report.agreement.kappa:.3f}")
-print(f"  Expected P(chance): {report.agreement.expected_chance_agreement:.3f}")
+def _fmt(value):
+    """alpha / kappa / P(e) are None when they cannot be estimated (see *_not_estimated_reason)."""
+    return "n/a" if value is None else f"{value:.3f}"
+
+
+print(f"  Krippendorff's α:   {_fmt(report.agreement.alpha)}  → {report.agreement.alpha_interpretation}")
+print(f"  Cohen's κ (mean):   {_fmt(report.agreement.kappa)}")
+print(f"  Expected P(chance): {_fmt(report.agreement.expected_chance_agreement)}")
 print()
 print(f"Bias diagnostics:")
 print(f"  Positional bias:    {report.bias.positional_bias_rate:.1%} of cases flipped")

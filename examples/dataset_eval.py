@@ -134,7 +134,9 @@ report = evaluator.evaluate_dataset(
 
 print(f"\n=== JuryEval Dataset Report ===")
 print(f"Mean uplift:       {report.mean_uplift:+.3f}")
-print(f"Krippendorff's α:  {report.agreement.alpha:.3f}  → {report.agreement.alpha_interpretation}")
+# alpha / kappa are None when they cannot be estimated (see *_not_estimated_reason)
+alpha, kappa = report.agreement.alpha, report.agreement.kappa
+print(f"Krippendorff's α:  {'n/a' if alpha is None else f'{alpha:.3f}'}  → {report.agreement.alpha_interpretation}")
 print(f"  Note: low α in a Jury is expected (diverse rubrics disagree by design)")
-print(f"Cohen's κ (mean):  {report.agreement.kappa:.3f}")
+print(f"Cohen's κ (mean):  {'n/a' if kappa is None else f'{kappa:.3f}'}")
 print(f"Verbosity bias ρ:  {report.bias.verbosity_bias_rho:.3f}")

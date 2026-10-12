@@ -376,16 +376,39 @@ class TestTextReportOptionalMetrics:
 
         report = _report(4, [0.8])
         assert report.agreement.n_judges == 1
+        assert report.agreement.alpha is None
+        assert report.agreement.alpha_not_estimated_reason == "single_judge"
         text = _render_text(report)
         alpha_line = _line(text, "Krippendorff α")
+        assert "n/a (needs at least 2 judges)" in alpha_line
+        assert "1.0000" not in alpha_line
+
+    def test_report_written_before_alpha_was_none_is_not_shown_as_agreement(self):
+        # A report saved by 0.3.2 carries alpha = 1.0 for a single judge.
+        from judge_kappa.cli.main import _render_text
+
+        legacy = _report(4, [0.8])
+        legacy.agreement = legacy.agreement.model_copy(
+            update={"alpha": 1.0, "alpha_interpretation": "strong agreement (α ≥ 0.80)",
+                    "alpha_not_estimated_reason": None}
+        )
+        alpha_line = _line(_render_text(legacy), "Krippendorff α")
         assert "n/a (needs at least 2 judges)" in alpha_line
         assert "1.0000" not in alpha_line
 
     def test_identical_scores_are_undefined_not_nan(self):
         from judge_kappa.cli.main import _render_text
 
-        text = _render_text(_report(4, [0.8, 0.8]))
-        assert "undefined (scores do not vary)" in _line(text, "Cohen κ")
+        report = _report(4, [0.8, 0.8])
+        assert report.agreement.kappa is None
+        assert report.agreement.kappa_not_estimated_reason == "no_score_variation"
+        assert report.agreement.alpha is None
+        assert report.agreement.alpha_not_estimated_reason == "no_score_variation"
+        text = _render_text(report)
+        assert "n/a (judges used one and the same single score)" in _line(text, "Cohen κ")
+        assert "n/a (judges used one and the same single score)" in _line(text, "Krippendorff α")
+        # the expected chance agreement is still a real number for identical scores
+        assert _line(text, "Expected P(e)") == "Expected P(e):    1.0000"
         assert "nan" not in text.lower()
 
     def test_ordinary_numeric_output_is_unchanged(self):

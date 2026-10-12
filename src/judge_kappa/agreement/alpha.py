@@ -27,6 +27,13 @@ import numpy as np
 from judge_kappa.agreement.base import AgreementMetric
 from judge_kappa.models import AgreementResult, JudgeVerdict, ScaleType
 
+# Short text for AgreementResult.alpha_not_estimated_reason (CLI report).
+ALPHA_NOT_ESTIMATED_TEXT: dict[str, str] = {
+    "single_judge": "needs at least 2 judges",
+    "no_pairable_values": "no case was scored by 2 or more judges",
+    "no_score_variation": "judges used one and the same single score",
+}
+
 
 def _interpret(alpha: float) -> str:
     """Map an alpha value to its Krippendorff (2004) reliability band."""
@@ -86,13 +93,27 @@ class KrippendorffAlpha(AgreementMetric):
 
         Returns:
             An ``AgreementResult`` with ``alpha``, its interpretation, the optional interval and
-            the judge and case counts. A score domain with a single value (all judges identical)
-            is treated as perfect agreement (alpha = 1.0).
+            the judge and case counts. Alpha is ``None`` (with ``alpha_not_estimated_reason``)
+            when it is undefined: ``single_judge`` or ``no_pairable_values`` when no case was
+            scored by 2 or more judges, and ``no_score_variation`` when every score is the same
+            value (observed and expected disagreement are both 0, so alpha is 0/0).
         """
         judge_ids = sorted({v.judge_id for v in verdicts})
         case_ids  = sorted({v.eval_case_id for v in verdicts})
 
         reliability_data = _build_matrix(verdicts, judge_ids, case_ids)
+
+        # Alpha compares values given to the same case by different judges. Without such a
+        # case it is undefined; reporting 1.0 would claim agreement nobody demonstrated.
+        n_pairable = int(np.sum(np.sum(~np.isnan(reliability_data), axis=0) >= 2))
+        if n_pairable == 0:
+            return AgreementResult(
+                alpha_not_estimated_reason=(
+                    "single_judge" if len(judge_ids) < 2 else "no_pairable_values"
+                ),
+                n_judges=len(judge_ids),
+                n_cases=len(case_ids),
+            )
 
         try:
             alpha = float(krippendorff.alpha(
@@ -100,8 +121,14 @@ class KrippendorffAlpha(AgreementMetric):
                 level_of_measurement=scale_type.value,
             ))
         except ValueError:
-            # Single-value domain: all raters gave identical scores → perfect agreement
-            alpha = 1.0
+            # With pairable cases present the only ValueError left is the single-value domain:
+            # every judge gave the same score, so alpha is 0/0. Report it as undefined rather
+            # than as perfect agreement, which would claim a reliability nobody demonstrated.
+            return AgreementResult(
+                alpha_not_estimated_reason="no_score_variation",
+                n_judges=len(judge_ids),
+                n_cases=len(case_ids),
+            )
 
         ci_low, ci_high = None, None
         if self._bootstrap_ci and len(case_ids) >= 5:

@@ -9,6 +9,34 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Identical scores are undefined for every agreement statistic, not perfect agreement.**
+  `agreement.alpha` is `None` (reason `no_score_variation`) when every score is the same value,
+  where it was `1.0` ("strong agreement"); `agreement.kappa` is `None` instead of `NaN` for the same
+  input; and `agreement.icc` is `None` instead of `1.0` ("excellent reliability"). Judges that never
+  vary have not shown that they agree on anything, and the three statistics no longer contradict one
+  another on the same report. Agreement *with* score variation is unchanged.
+- **`agreement.alpha` is `None` when no case was scored by 2 or more judges** (a single judge, or
+  judges whose cases do not overlap), instead of `1.0`. The blanket `except ValueError` around the
+  Krippendorff call turned "undefined" into "perfect".
+  `agreement.alpha_not_estimated_reason` is `single_judge`, `no_pairable_values` or
+  `no_score_variation`.
+- **`agreement.kappa` is `None`, not `NaN`, when a compared judge pair used one and the same single
+  score** (kappa is 0/0). `agreement.kappa_not_estimated_reason` is `no_score_variation`, or
+  `no_judge_pair` when no pair shares 2 cases. `expected_chance_agreement` is still reported for
+  identical scores. scikit-learn's `NaN` and its two warnings no longer occur.
+- **`agreement.icc` is `None` instead of `0.0` / `1.0` when ICC(2,k) is undefined**, with
+  `agreement.icc_not_estimated_reason` `insufficient_data` or `no_score_variation`. The standalone
+  `compute_icc()` function keeps its return convention.
+- **Per-case alpha:** a case on which the judges agree exactly now has `alpha = None` (it was `1.0`).
+- **`BehavioralAlignmentMetric`** reports `alpha = None` with a reason-specific interpretation
+  (`not estimated: ...`) instead of the generic `insufficient data`.
+- **Code that formats `alpha`, `kappa` or `icc` must handle `None`** for single-judge or
+  constant-score runs (for example `f"{report.agreement.alpha:.3f}"` raises). The examples and docs
+  that did so now guard it; the CLI text report prints `n/a (<reason>)`, and a report saved before
+  this change that still carries `alpha = 1.0` for one judge is not rendered as agreement.
+
 ---
 
 ## [0.3.2] — 2026-10-12

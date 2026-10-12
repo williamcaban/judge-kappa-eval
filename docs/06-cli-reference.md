@@ -137,7 +137,8 @@ judge-kappa run config.yaml --format json | python3 -c "
 import json, sys
 r = json.load(sys.stdin)
 print(f'uplift: {r[\"mean_uplift\"]:+.3f}')
-print(f'alpha:  {r[\"agreement\"][\"alpha\"]:.3f}')
+a = r[\"agreement\"][\"alpha\"]   # null for a single judge
+print('alpha:  n/a' if a is None else f'alpha:  {a:.3f}')
 "
 ```
 

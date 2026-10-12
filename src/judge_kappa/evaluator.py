@@ -413,7 +413,7 @@ class JuryEvaluator:
         trt_score  = self._panel.aggregate_score(trt_verdicts)
 
         # Per-case agreement (meaningful only with ≥ 2 judges)
-        case_agreement = AgreementResult()
+        case_agreement = AgreementResult(alpha_not_estimated_reason="single_judge")
         if len(ctrl_verdicts) >= 2:
             case_agreement = self._alpha_metric.compute(ctrl_verdicts, self._scale_type)
 
@@ -490,6 +490,8 @@ class JuryEvaluator:
             alpha_ci_high=corpus_alpha.alpha_ci_high,
             expected_chance_agreement=corpus_kappa.expected_chance_agreement,
             alpha_interpretation=corpus_alpha.alpha_interpretation,
+            alpha_not_estimated_reason=corpus_alpha.alpha_not_estimated_reason,
+            kappa_not_estimated_reason=corpus_kappa.kappa_not_estimated_reason,
             n_judges=corpus_alpha.n_judges,
             n_cases=corpus_alpha.n_cases,
         )

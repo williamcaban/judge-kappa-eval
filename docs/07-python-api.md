@@ -114,9 +114,12 @@ report = evaluator.evaluate_skill(
     treatment_variant=Variant(name="treatment"),  # SKILL.md injected automatically
 )
 
+a = report.agreement  # alpha / kappa are None when they cannot be estimated (single judge, ...)
 print(f"Uplift: {report.mean_uplift:+.3f}")
-print(f"α:      {report.agreement.alpha:.3f}  — {report.agreement.alpha_interpretation}")
-print(f"κ:      {report.agreement.kappa:.3f}")
+print(f"α:      {a.alpha:.3f}  — {a.alpha_interpretation}" if a.alpha is not None
+      else f"α:      n/a ({a.alpha_not_estimated_reason})")
+print(f"κ:      {a.kappa:.3f}" if a.kappa is not None
+      else f"κ:      n/a ({a.kappa_not_estimated_reason})")
 ```
 
 ---
@@ -491,12 +494,15 @@ report = evaluator.evaluate_skill("./my-skill")
 
 # Corpus-level agreement (v0.2: + CI and ICC)
 report.mean_uplift                        # float: treatment − control
-report.agreement.alpha                    # Krippendorff's α
+report.agreement.alpha                    # Krippendorff's α; None when not estimated
+report.agreement.alpha_not_estimated_reason  # None, "single_judge", "no_pairable_values", "no_score_variation"
 report.agreement.alpha_ci_low            # 95% bootstrap CI lower bound (v0.2)
 report.agreement.alpha_ci_high           # 95% bootstrap CI upper bound (v0.2)
 report.agreement.alpha_interpretation     # "strong agreement (α ≥ 0.80)"
-report.agreement.kappa                    # Cohen's κ (mean pairwise)
-report.agreement.icc                      # ICC(2,k) absolute agreement (v0.2)
+report.agreement.kappa                    # Cohen's κ (mean pairwise); None when not estimated
+report.agreement.kappa_not_estimated_reason  # None, "no_judge_pair", "no_score_variation"
+report.agreement.icc                      # ICC(2,k) absolute agreement (v0.2); None when not estimated
+report.agreement.icc_not_estimated_reason # None, "insufficient_data", "no_score_variation"
 report.agreement.icc_interpretation       # "excellent reliability (ICC ≥ 0.75)" (v0.2)
 report.agreement.expected_chance_agreement # P(e)
 

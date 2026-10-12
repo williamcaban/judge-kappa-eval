@@ -19,6 +19,8 @@ from pathlib import Path
 
 import yaml
 
+from judge_kappa.agreement.alpha import ALPHA_NOT_ESTIMATED_TEXT
+from judge_kappa.agreement.kappa import KAPPA_NOT_ESTIMATED_TEXT
 from judge_kappa.bias.verbosity import NOT_ESTIMATED_TEXT
 from judge_kappa.cli.builder import build_evaluator, load_dataset
 from judge_kappa.cli.config_schema import DatasetModeConfig, PairwiseModeConfig, SkillModeConfig
@@ -44,10 +46,6 @@ def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig | PairwiseMod
     raise RuntimeError("unreachable")
 
 
-_NEEDS_PAIR = "n/a (needs at least 2 judges and 2 shared cases)"
-_NEEDS_TWO_JUDGES = "n/a (needs at least 2 judges)"
-
-
 def _fmt_metric(value: float | None, missing: str) -> str:
     """Format an optional metric to 4 places; say why when it is absent or undefined."""
     if value is None:
@@ -58,16 +56,35 @@ def _fmt_metric(value: float | None, missing: str) -> str:
 
 
 def _render_alpha(report: EvalReport) -> str:
-    """Krippendorff's alpha line. Alpha is not defined for a single judge, so say so."""
+    """Krippendorff's alpha line; says why when it could not be estimated."""
     agreement = report.agreement
-    if agreement.n_judges < 2:
-        # The model carries 1.0 here (its single-value-domain fallback). Do not present that
-        # as "perfect agreement" between judges when there is only one.
-        return f"  Krippendorff α:   {_NEEDS_TWO_JUDGES}"
+    if agreement.alpha is None or agreement.n_judges < 2:
+        # A numeric alpha with fewer than 2 judges comes from a report written before alpha was
+        # None for a single judge, when it carried a 1.0 fallback. Do not show that as agreement.
+        reason = agreement.alpha_not_estimated_reason or "single_judge"
+        return f"  Krippendorff α:   n/a ({ALPHA_NOT_ESTIMATED_TEXT[reason]})"
     line = f"  Krippendorff α:   {_fmt_metric(agreement.alpha, 'n/a')}"
-    if agreement.alpha is not None and agreement.alpha_interpretation:
+    if agreement.alpha_interpretation:
         line += f"  → {agreement.alpha_interpretation}"
     return line
+
+
+def _render_kappa(report: EvalReport) -> str:
+    """Cohen's kappa line; says why when it could not be estimated."""
+    agreement = report.agreement
+    if agreement.kappa is None:
+        reason = agreement.kappa_not_estimated_reason or "no_judge_pair"
+        return f"  Cohen κ (mean):   n/a ({KAPPA_NOT_ESTIMATED_TEXT[reason]})"
+    return f"  Cohen κ (mean):   {_fmt_metric(agreement.kappa, 'n/a')}"
+
+
+def _render_expected_chance(report: EvalReport) -> str:
+    """Expected chance agreement line; absent only when no judge pair could be compared."""
+    missing = f"n/a ({KAPPA_NOT_ESTIMATED_TEXT['no_judge_pair']})"
+    return (
+        "  Expected P(e):    "
+        f"{_fmt_metric(report.agreement.expected_chance_agreement, missing)}"
+    )
 
 
 def _render_verbosity_rho(report: EvalReport) -> str:
@@ -92,8 +109,8 @@ def _render_text(report: EvalReport) -> str:
         "",
         "Inter-rater agreement:",
         _render_alpha(report),
-        f"  Cohen κ (mean):   {_fmt_metric(report.agreement.kappa, _NEEDS_PAIR)}",
-        f"  Expected P(e):    {_fmt_metric(report.agreement.expected_chance_agreement, _NEEDS_PAIR)}",
+        _render_kappa(report),
+        _render_expected_chance(report),
         f"  Judges:           {report.agreement.n_judges}",
         "",
         "Bias diagnostics:",

@@ -373,7 +373,7 @@ All new code must be covered by tests in `tests/`. Requirements:
 - Zero real LLM calls — use `MockLLMBackend` from `tests/conftest.py`
 - Tests must pass under both `Python 3.12` and `Python 3.13`
 - Coverage must not decrease (check with `uv run pytest --cov --cov-report=term-missing`)
-- For new agreement metrics: test the boundary conditions (α=1.0 on perfect agreement, α≈0 on random)
+- For new agreement metrics: test the boundary conditions (α=1.0 on perfect agreement with score variation, α≈0 on random, α=None when every score is identical)
 - For new bias detectors: test both the flagged and clean cases
 
 ### 6.9 — Release process (for maintainers)

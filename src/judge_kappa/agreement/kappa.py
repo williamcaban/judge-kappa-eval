@@ -24,6 +24,12 @@ from judge_kappa.models import AgreementResult, JudgeVerdict, ScaleType
 
 _DISCRETIZE_BINS = 5  # 0.0–1.0 continuous score → 5 ordinal buckets
 
+# Short text for AgreementResult.kappa_not_estimated_reason (CLI report).
+KAPPA_NOT_ESTIMATED_TEXT: dict[str, str] = {
+    "no_judge_pair": "needs at least 2 judges and 2 shared cases",
+    "no_score_variation": "judges used one and the same single score",  # as for alpha
+}
+
 
 def _discretize(scores: list[float], n_bins: int = _DISCRETIZE_BINS) -> list[int]:
     """Bin scores in [0, 1] into equal-width integer categories.
@@ -63,7 +69,10 @@ class CohenKappa(AgreementMetric):
         Returns:
             An ``AgreementResult`` with ``kappa`` and ``expected_chance_agreement`` averaged over
             the judge pairs that share at least 2 cases. When no pair qualifies only the judge and
-            case counts are filled.
+            case counts are filled and ``kappa_not_estimated_reason`` is ``no_judge_pair``. When a
+            qualifying pair used one and the same single category kappa is 0/0, so the mean is
+            undefined: ``kappa`` is ``None`` with reason ``no_score_variation`` (the expected
+            chance agreement is still reported).
         """
         judge_ids = sorted({v.judge_id for v in verdicts})
         case_ids  = sorted({v.eval_case_id for v in verdicts})
@@ -78,6 +87,7 @@ class CohenKappa(AgreementMetric):
 
         pairwise_kappas: list[float] = []
         pairwise_expected: list[float] = []
+        undefined_pair = False
 
         for j1, j2 in itertools.combinations(judge_ids, 2):
             shared = [c for c in case_ids if c in matrix[j1] and c in matrix[j2]]
@@ -85,14 +95,30 @@ class CohenKappa(AgreementMetric):
                 continue
             r1 = _discretize([matrix[j1][c] for c in shared])
             r2 = _discretize([matrix[j2][c] for c in shared])
-            pairwise_kappas.append(float(cohen_kappa_score(r1, r2, weights=weights)))
             pairwise_expected.append(_expected_chance_agreement(r1, r2))
+            if len(set(r1) | set(r2)) < 2:
+                # Both judges used the same single category: observed = expected agreement = 1,
+                # so kappa is 0/0. Do not call sklearn (NaN plus two warnings).
+                undefined_pair = True
+                continue
+            pairwise_kappas.append(float(cohen_kappa_score(r1, r2, weights=weights)))
 
-        if not pairwise_kappas:
-            return AgreementResult(n_judges=len(judge_ids), n_cases=len(case_ids))
+        if not pairwise_expected:
+            return AgreementResult(
+                kappa_not_estimated_reason="no_judge_pair",
+                n_judges=len(judge_ids),
+                n_cases=len(case_ids),
+            )
 
-        mean_kappa    = float(np.mean(pairwise_kappas))
         mean_expected = float(np.mean(pairwise_expected))
+        if undefined_pair:
+            return AgreementResult(
+                expected_chance_agreement=round(mean_expected, 4),
+                kappa_not_estimated_reason="no_score_variation",
+                n_judges=len(judge_ids),
+                n_cases=len(case_ids),
+            )
+        mean_kappa = float(np.mean(pairwise_kappas))
 
         return AgreementResult(
             kappa=round(mean_kappa, 4),

@@ -29,8 +29,10 @@ Control score:      0.450
 Treatment score:    0.760
 
 Inter-rater agreement:
-  Krippendorff α:   n/a  (requires ≥ 2 judges)
-  Cohen κ:          n/a
+  Krippendorff α:   n/a (needs at least 2 judges)
+  Cohen κ (mean):   n/a (needs at least 2 judges and 2 shared cases)
+  Expected P(e):    n/a (needs at least 2 judges and 2 shared cases)
+  Judges:           1
 
 Bias diagnostics:
   Positional bias:  n/a  (no positional_judge configured)
