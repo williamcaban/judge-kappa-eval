@@ -68,6 +68,24 @@ print(result.alpha_interpretation)
 
 Bootstrap resamples cases (columns of the reliability matrix), not judges, which is the correct unit of observation for Krippendorff.
 
+### When agreement cannot be estimated
+
+`agreement.alpha` and `agreement.kappa` are `None` (never `NaN`, and never a made-up `1.0`) when they are undefined, and a reason field says why:
+
+| Field | Reason | Meaning |
+|---|---|---|
+| `alpha_not_estimated_reason` | `single_judge` | Fewer than 2 judges scored anything. Alpha compares values that different judges gave to the same case |
+| | `no_pairable_values` | 2 or more judges, but no case was scored by 2 or more of them (disjoint coverage) |
+| `kappa_not_estimated_reason` | `no_judge_pair` | No two judges share at least 2 cases |
+| | `no_score_variation` | A compared pair used one and the same single score, so observed and expected agreement are both 1 and kappa is 0/0. `expected_chance_agreement` is still reported |
+
+Two conventions are worth knowing:
+
+- **Identical scores from 2 or more judges on shared cases give `alpha = 1.0`.** Krippendorff's formula is 0/0 there; the library treats it as perfect agreement, as before. Kappa is *not* given the same treatment, because "every judge said 1.0 on everything" shows no discrimination at all. Read an `alpha` of exactly `1.0` together with the score spread.
+- **`kappa` is the mean over judge pairs.** If any compared pair is undefined the mean is undefined, so `kappa` is `None` even when other pairs are fine.
+
+Earlier releases reported `alpha = 1.0` ("strong agreement") for a single judge and for judges with disjoint cases, and `kappa = NaN` in Python (`null` in JSON) for identical single scores. Code that formats these values (`f"{report.agreement.alpha:.3f}"`) now has to handle `None`. The CLI text report prints `n/a (<reason>)`.
+
 ---
 
 ## 2 — ICC(2,k) variance decomposition

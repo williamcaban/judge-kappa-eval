@@ -325,9 +325,14 @@ print("  Always validate judge α ≥ 0.67 *before* trusting this McNemar result
 print()
 
 # Agreement summary with CIs
-print(f"  Agreement (α = {report.agreement.alpha:.3f})")
-if report.agreement.alpha_ci_low is not None:
-    print(f"    95% CI: [{report.agreement.alpha_ci_low:.3f}, {report.agreement.alpha_ci_high:.3f}]")
+if report.agreement.alpha is None:
+    # One judge: alpha compares judges, so it is not estimated (see alpha_not_estimated_reason)
+    print(f"  Agreement: not estimated ({report.agreement.alpha_not_estimated_reason}, "
+          "this demo uses a single judge)")
+else:
+    print(f"  Agreement (α = {report.agreement.alpha:.3f})")
+    if report.agreement.alpha_ci_low is not None:
+        print(f"    95% CI: [{report.agreement.alpha_ci_low:.3f}, {report.agreement.alpha_ci_high:.3f}]")
 
 print()
 print("─" * 60)

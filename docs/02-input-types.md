@@ -187,11 +187,12 @@ Key fields:
 mean_uplift              : +0.234    signed delta (treatment − control)
 mean_control_score       : 0.512
 mean_treatment_score     : 0.746
-agreement.alpha          : 0.812     Krippendorff's α across judges and cases
+agreement.alpha          : 0.812     Krippendorff's α across judges and cases (None for a single judge)
 agreement.alpha_ci_low   : 0.701     bootstrap 95% CI lower bound (v0.2)
 agreement.alpha_ci_high  : 0.889     bootstrap 95% CI upper bound (v0.2)
 agreement.icc            : 0.831     ICC(2,k) absolute agreement (v0.2)
-agreement.kappa          : 0.791     Cohen's κ (mean pairwise)
+agreement.kappa          : 0.791     Cohen's κ (mean pairwise; None without a judge pair)
+agreement.*_not_estimated_reason : why alpha / kappa is None, see docs/10 "When agreement cannot be estimated"
 significance.p_value     : 0.009     McNemar p-value (v0.2)
 significance.significant : true      p < 0.05 (v0.2)
 significance.uplift_ci_low  : 0.120  bootstrap CI for mean_uplift (v0.2)

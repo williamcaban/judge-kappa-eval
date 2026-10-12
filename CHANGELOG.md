@@ -9,6 +9,22 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **`agreement.alpha` is `None` when no case was scored by 2 or more judges** (a single judge, or
+  judges whose cases do not overlap), instead of `1.0` ("strong agreement"). The blanket
+  `except ValueError` around the Krippendorff call turned "undefined" into "perfect". Identical
+  scores from 2 or more judges on shared cases still give `1.0`, as documented.
+  `agreement.alpha_not_estimated_reason` is `single_judge` or `no_pairable_values`.
+- **`agreement.kappa` is `None`, not `NaN`, when a compared judge pair used one and the same single
+  score** (kappa is 0/0). `agreement.kappa_not_estimated_reason` is `no_score_variation`, or
+  `no_judge_pair` when no pair shares 2 cases. `expected_chance_agreement` is still reported for
+  identical scores. scikit-learn's `NaN` and its two warnings no longer occur.
+- **Code that formats `alpha` or `kappa` must handle `None`** for single-judge or constant-score
+  runs (for example `f"{report.agreement.alpha:.3f}"` raises). The examples and docs that did so
+  now guard it; the CLI text report prints `n/a (<reason>)`, and a report saved before this change
+  that still carries `alpha = 1.0` for one judge is not rendered as agreement.
+
 ---
 
 ## [0.3.2] — 2026-10-12
