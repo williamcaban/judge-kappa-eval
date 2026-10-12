@@ -55,8 +55,8 @@ judge-kappa = "judge_kappa.cli.main:app"
 [project.optional-dependencies]
 openai    = ["openai>=1.30"]
 anthropic = ["anthropic>=0.28"]
-tiktoken  = ["tiktoken>=0.7"]              # accurate token counts for verbosity bias
-all       = ["judge-kappa[openai,anthropic,tiktoken]"]
+tiktoken  = []                             # deprecated no-op, kept so existing install commands still resolve
+all       = ["judge-kappa[openai,anthropic]"]
 
 # uv-native dev dependencies (uv sync --group dev)
 [dependency-groups]

@@ -50,7 +50,7 @@ uv add "judge-kappa[anthropic]"
 pip install "judge-kappa[openai]"
 uv add "judge-kappa[openai]"
 
-# Everything including tiktoken for accurate verbosity-bias token counts
+# Both provider SDKs (OpenAI-compatible and Anthropic)
 pip install "judge-kappa[all]"
 uv add "judge-kappa[all]"
 ```

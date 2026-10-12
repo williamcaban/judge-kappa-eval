@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -211,6 +211,17 @@ class BiasResult(BaseModel):
     verbosity_bias_rho: float | None = None  # Spearman ρ(length, score)
     verbosity_bias_p: float | None = None
     verbosity_biased: bool = False
+    # Verdicts with a measured output length (output_token_count > 0) used in the correlation,
+    # and verdicts left out because no length was recorded.
+    verbosity_n_measured: int = 0
+    verbosity_n_unmeasured: int = 0
+    # Why verbosity_bias_rho is None. None here means it was estimated. The correlation is
+    # undefined when every score (or every length) is identical, and too noisy to report with
+    # fewer than 3 measured verdicts. ``verbosity_biased`` is False in all of these cases:
+    # check ``verbosity_bias_rho is None`` before reading it as "no bias".
+    verbosity_not_estimated_reason: (
+        Literal["too_few_measured", "constant_scores", "constant_lengths"] | None
+    ) = None
 
 
 class UpliftSignificance(BaseModel):

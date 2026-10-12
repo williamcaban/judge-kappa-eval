@@ -130,12 +130,19 @@ class TestJuryEvaluatorEvaluate:
 
     def test_bias_fields_populated(self):
         cases = [_make_case(f"c{i}", ["A"]) for i in range(4)]
-        ev, _ = _make_evaluator([_assertion_resp({"A": 0.8})], n_judges=2)
-        ctrl = Variant(name="control",   predict_fn=lambda _: "ctrl")
-        trt  = Variant(name="treatment", predict_fn=lambda _: "trt")
+        # Varying scores and output lengths, so a real correlation is estimated end to end.
+        ev, _ = _make_evaluator(
+            [_assertion_resp({"A": 0.2}), _assertion_resp({"A": 0.9})], n_judges=2
+        )
+        lengths = iter(range(1, 100))
+        ctrl = Variant(name="control",   predict_fn=lambda _: "w " * next(lengths))
+        trt  = Variant(name="treatment", predict_fn=lambda _: "w " * next(lengths))
         report = ev.evaluate(cases, ctrl, trt)
         assert isinstance(report.bias.positional_bias_rate, float)
         assert report.bias.verbosity_bias_rho is not None
+        assert report.bias.verbosity_bias_p is not None
+        assert report.bias.verbosity_not_estimated_reason is None
+        assert report.bias.verbosity_n_unmeasured == 0
 
     def test_judge_ids_in_report(self):
         cases = [_make_case("c1", ["A"])]
@@ -388,3 +395,58 @@ class TestMcNemarSignificance:
         assert sig.mcnemar_statistic == 0.0
         assert sig.p_value == 1.0
         assert sig.significant is False
+
+
+class TestVerbosityLengthReporting:
+    """Verdicts with no measured output length are reported, not silently re-measured."""
+
+    @staticmethod
+    def _run(output: str):
+        cases = [_make_case(f"c{i}", ["A"]) for i in range(4)]
+        ev, _ = _make_evaluator([_assertion_resp({"A": 1.0})])
+        ctrl = Variant(name="control",   predict_fn=lambda _: output)
+        trt  = Variant(name="treatment", predict_fn=lambda _: output)
+        return ev.evaluate(cases, ctrl, trt)
+
+    def test_empty_outputs_are_reported_as_unmeasured(self):
+        report = self._run("")
+        # 4 cases x 2 variants x 2 judges
+        assert report.bias.verbosity_n_measured == 0
+        assert report.bias.verbosity_n_unmeasured == 16
+        assert report.bias.verbosity_bias_rho is None
+        warnings = [w for w in report.data_quality.warnings if "output length" in w]
+        assert len(warnings) == 1
+        assert "16 of 16 verdicts" in warnings[0] and "not estimated" in warnings[0]
+
+    def test_measured_outputs_raise_no_length_warning(self):
+        report = self._run("three word output")
+        assert report.bias.verbosity_n_measured == 16
+        assert report.bias.verbosity_n_unmeasured == 0
+        assert not [w for w in report.data_quality.warnings if "left out of the" in w]
+
+    def test_constant_scores_are_reported_without_a_scipy_warning(self):
+        import warnings
+
+        from scipy.stats import ConstantInputWarning
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", category=ConstantInputWarning)
+            report = self._run("three word output")  # every judge reply scores 1.0
+        assert report.bias.verbosity_bias_rho is None
+        assert report.bias.verbosity_bias_p is None
+        assert report.bias.verbosity_biased is False
+        assert report.bias.verbosity_not_estimated_reason == "constant_scores"
+        # A property of the data, not a data-quality problem: a clean run stays clean.
+        assert report.data_quality.warnings == []
+
+    def test_text_report_renders_when_verbosity_is_not_estimated(self):
+        # Regression: the text renderer formatted the optional rho with :.4f and raised
+        # TypeError for None, which became reachable once unmeasured verdicts were excluded.
+        from judge_kappa.cli.main import _render_text
+
+        unmeasured = _render_text(self._run(""))
+        assert "not estimated (fewer than 3 verdicts with a measured output length)" in unmeasured
+        constant = _render_text(self._run("three word output"))
+        assert "not estimated (all judge scores are identical)" in constant
+        assert "Verbosity flagged:n/a" in constant
+

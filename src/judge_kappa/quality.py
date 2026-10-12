@@ -20,13 +20,20 @@ logger = logging.getLogger("judge_kappa.quality")
 ReplyFlag = tuple[str, str | None, bool]
 
 
-def compute_data_quality(replies: Iterable[ReplyFlag], extra_truncated: int = 0) -> DataQuality:
+def compute_data_quality(
+    replies: Iterable[ReplyFlag],
+    extra_truncated: int = 0,
+    extra_warnings: Iterable[str] = (),
+) -> DataQuality:
     """Summarise reply flags.
 
     Args:
         replies: one ``(judge_id, parse_error, truncated)`` per judge reply.
         extra_truncated: truncated replies seen outside ``replies`` (for example
             generation calls), added to ``n_truncated_replies``.
+        extra_warnings: further data-quality warnings from outside the reply flags
+            (for example verdicts with no measured output length); logged and
+            appended after the reply warnings.
     """
     n = 0
     by_judge: Counter[str] = Counter()
@@ -54,6 +61,7 @@ def compute_data_quality(replies: Iterable[ReplyFlag], extra_truncated: int = 0)
             f"{truncated} replies hit the output-token limit. Raise the backend max_tokens; "
             "truncated judge JSON is unusable and truncated generations bias the evaluation."
         )
+    warnings.extend(extra_warnings)
     dq = DataQuality(
         n_judge_calls=n,
         n_parse_failures=failures,

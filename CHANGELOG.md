@@ -9,6 +9,43 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **Verbosity bias no longer falls back to the judge's rationale length.** A verdict with
+  `output_token_count == 0` used to be measured by the word count of its *rationale*, which is
+  the judge's own wordiness, not the length of the output being judged, and it fed
+  `verbosity_bias_rho` silently. Such verdicts are now left out of the correlation. Built-in
+  judges always record the output's word count, so their numbers do not move (an empty output has
+  length 0 and is now reported as unmeasured). Custom judges that never set `output_token_count`
+  previously got a rationale-based figure and now get no estimate plus a warning.
+- **`verbosity_bias_rho` / `verbosity_bias_p` are `None`, not `NaN`, when the correlation is
+  undefined** (all scores identical, all lengths identical, or fewer than 3 measured verdicts).
+  `spearmanr` used to be called on the constant vector, returned `NaN` and emitted a SciPy
+  `ConstantInputWarning` that never reached the report; `model_dump()` held `nan` while the JSON
+  held `null`. The call is now skipped. `verbosity_biased` is `False` in these cases, so check
+  `verbosity_bias_rho is None` first. The CLI text report prints `not estimated (<reason>)`.
+
+### Added
+
+- `BiasResult.verbosity_n_measured` and `BiasResult.verbosity_n_unmeasured`, and a
+  `data_quality.warnings` entry when verdicts were left out of the verbosity correlation.
+- `BiasResult.verbosity_not_estimated_reason` (`too_few_measured`, `constant_scores`,
+  `constant_lengths`): says why `verbosity_bias_rho` is `None`.
+
+### Deprecated
+
+- `VerbosityBiasDetector(tiktoken_encoding=...)`: it was accepted but never used. It now emits a
+  `DeprecationWarning` and is ignored.
+- The `tiktoken` extra is a no-op and is no longer part of `[all]`. `tiktoken` was never imported by
+  the library, so nothing changes for code; `pip install "judge-kappa[tiktoken]"` still resolves.
+
+### Fixed
+
+- Documentation claimed that tiktoken gave "accurate token counts" for verbosity bias
+  (README, `docs/10` §9, the detector's module docstring). Lengths are whitespace word counts of
+  the evaluated output; `docs/10` §9 now says so, and explains how to supply your own measure for
+  CJK text and code.
+
 ---
 
 ## [0.3.1] — 2026-10-12

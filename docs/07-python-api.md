@@ -516,8 +516,11 @@ for jf in report.judge_fit:
 
 # Bias
 report.bias.positional_bias_rate          # fraction of cases with A/B flip
-report.bias.verbosity_bias_rho            # Spearman ρ(length, score)
-report.bias.verbosity_biased              # bool
+report.bias.verbosity_bias_rho            # Spearman ρ(length, score); None when not estimated
+report.bias.verbosity_biased              # bool; False also when not estimated
+report.bias.verbosity_not_estimated_reason  # None, "too_few_measured", "constant_scores", "constant_lengths"
+report.bias.verbosity_n_measured          # verdicts used in the correlation
+report.bias.verbosity_n_unmeasured        # verdicts with no output length, left out
 
 # Per-case
 for case in report.cases:
@@ -535,7 +538,7 @@ for verdict in case.verdicts:
     verdict.rationale
     verdict.assertion_scores         # {"assertion text": 0.0|1.0}
     verdict.dimension_scores         # {"dim name": 0.0–1.0}
-    verdict.output_token_count
+    verdict.output_token_count       # whitespace word count of the evaluated output; 0 = not measured
 
 # Serialize
 json_str = report.model_dump_json(indent=2)

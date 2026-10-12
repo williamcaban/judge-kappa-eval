@@ -18,6 +18,7 @@ from pathlib import Path
 
 import yaml
 
+from judge_kappa.bias.verbosity import NOT_ESTIMATED_TEXT
 from judge_kappa.cli.builder import build_evaluator, load_dataset
 from judge_kappa.cli.config_schema import DatasetModeConfig, PairwiseModeConfig, SkillModeConfig
 from judge_kappa.judges.base import JudgeParseError
@@ -42,6 +43,17 @@ def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig | PairwiseMod
     raise RuntimeError("unreachable")
 
 
+def _render_verbosity_rho(report: EvalReport) -> str:
+    """One line for the verbosity correlation; says so when it could not be estimated."""
+    rho = report.bias.verbosity_bias_rho
+    if rho is None:
+        reason = report.bias.verbosity_not_estimated_reason
+        why = f" ({NOT_ESTIMATED_TEXT[reason]})" if reason else ""
+        return f"  Verbosity ρ:      not estimated{why}"
+    p = report.bias.verbosity_bias_p
+    return f"  Verbosity ρ:      {rho:.4f}" + (f"  (p={p:.4f})" if p is not None else "")
+
+
 def _render_text(report: EvalReport) -> str:
     """Render the human-readable text report, including data-quality warnings and a usage line."""
     lines = [
@@ -60,9 +72,8 @@ def _render_text(report: EvalReport) -> str:
         "",
         "Bias diagnostics:",
         f"  Positional bias:  {report.bias.positional_bias_rate:.1%} of cases flipped",
-        f"  Verbosity ρ:      {report.bias.verbosity_bias_rho:.4f}"
-        + (f"  (p={report.bias.verbosity_bias_p:.4f})" if report.bias.verbosity_bias_p is not None else ""),
-        f"  Verbosity flagged:{report.bias.verbosity_biased}",
+        _render_verbosity_rho(report),
+        f"  Verbosity flagged:{'n/a' if report.bias.verbosity_bias_rho is None else report.bias.verbosity_biased}",
         "",
         "Per-case results:",
     ]
