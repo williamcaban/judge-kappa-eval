@@ -45,6 +45,13 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (README, `docs/10` §9, the detector's module docstring). Lengths are whitespace word counts of
   the evaluated output; `docs/10` §9 now says so, and explains how to supply your own measure for
   CJK text and code.
+- **`judge-kappa run --format text` no longer crashes when there is no judge pair.** The text
+  report formatted `Krippendorff α`, `Cohen κ` and `Expected P(e)` with `:.4f` unconditionally and
+  raised `TypeError` when they are `None`, which is the case for every single-judge run and for
+  runs where no two judges share 2 cases. They now print `n/a (needs ...)`; identical scores, where
+  κ is `NaN`, print `undefined (scores do not vary)`. With a single judge, α prints
+  `n/a (needs at least 2 judges)` instead of the model's `1.0` fallback, which would read as perfect
+  agreement between judges. The JSON report is unchanged.
 
 ---
 
