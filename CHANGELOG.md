@@ -9,6 +9,14 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.3.2] — 2026-10-12
+
+> **Heads-up:** no numbers change for the built-in judges. `verbosity_bias_rho` and
+> `verbosity_bias_p` are now `None` instead of `NaN` when the correlation is undefined, and
+> `judge-kappa run --format text` no longer crashes for single-judge runs; see *Changed* and *Fixed*.
+
 ### Changed
 
 - **Verbosity bias no longer falls back to the judge's rationale length.** A verdict with
@@ -57,6 +65,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   situation: the model reports its `1.0` single-value-domain fallback, so for a single judge the
   text report prints `n/a (needs at least 2 judges)` rather than a value that reads as perfect
   agreement between judges. The model and the JSON report are unchanged.
+
 ---
 
 ## [0.3.1] — 2026-10-12
@@ -346,7 +355,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 8 test modules, 60+ tests, zero real LLM calls (MockLLMBackend)
 - Coverage: models, adapters, judges (scoring math, ICL, malformed JSON), panels, agreement metrics, bias detectors, evaluator integration, CLI schema validation, key resolution
 
-[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.2.0...v0.2.1
