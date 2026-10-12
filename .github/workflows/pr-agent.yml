@@ -2,7 +2,7 @@
 name: PR Agent
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, ready_for_review, review_requested]
   issue_comment:
     types: [created]
 
@@ -25,6 +25,6 @@ jobs:
       issues: write
       pull-requests: write
       contents: read
-    uses: interplay-adversarial/.github/.github/workflows/pr-agent.yml@cda8f5a9ba0b0c215927af1ce5613d025c6a6b88   # shared workflow, bumped by Dependabot
+    uses: interplay-adversarial/.github/.github/workflows/pr-agent.yml@bae5e9ff40cf916892fe964594ee3158eedd3ef3   # shared workflow, bumped by Dependabot
     secrets:
       MAAS_API_KEY: ${{ secrets.MAAS_API_KEY }}
