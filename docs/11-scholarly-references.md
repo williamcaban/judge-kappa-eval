@@ -168,9 +168,9 @@ A practitioner can use this document to understand the theoretical basis of each
 
 ## 13 — Verbosity Bias Detection
 
-**What it is.** An LLM judge may systematically reward longer outputs regardless of their content quality ("length bias" or "verbosity bias"). Detected via Spearman rank correlation between output token count and judge score. A significant positive ρ indicates the judge is rewarding length, not quality.
+**What it is.** An LLM judge may systematically reward longer outputs regardless of their content quality ("length bias" or "verbosity bias"). Detected via Spearman rank correlation between output length and judge score. A significant positive ρ indicates the judge is rewarding length, not quality.
 
-**In judge-kappa.** `VerbosityBiasDetector` in `bias/verbosity.py`. Flags when `|ρ| > threshold` AND `p < 0.05`. Default threshold 0.30; stricter 0.25 recommended for regulatory use. v0.2 documents tiktoken integration for accurate token counts (`pip install judge-kappa[tiktoken]`).
+**In judge-kappa.** `VerbosityBiasDetector` in `bias/verbosity.py`. Flags when `|ρ| > threshold` AND `p < 0.05`. Default threshold 0.30; stricter 0.25 recommended for regulatory use. Length is `JudgeVerdict.output_token_count`, which the built-in judges set to the whitespace word count of the evaluated output (words, not model tokens); verdicts without a length are excluded and reported.
 
 **Primary sources.**
 - Saito, I., Oseki, Y., & Noji, H. (2023). Verbosity bias in preference labeling by large language models. *arXiv:2310.10076*. https://arxiv.org/abs/2310.10076

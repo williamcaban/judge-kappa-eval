@@ -17,7 +17,7 @@ judge-kappa v0.2 adds nine psychometrically grounded capabilities. This document
 | IRT-based judge weighting | `IRTJudgeWeighter` | `demo_irt_weighting.py` |
 | Listwise ranking for N ≥ 7 | `RankJudge` | `demo_rank_judge.py` |
 | Order-aware BTL ranking + display-order effect | `fit_btl`, `bootstrap_btl`, `TournamentEvaluator`, `PositionalBiasDetector.estimate_order_effect` | `demo_order_aware_ranking.py` |
-| Accurate verbosity tokens | `pip install judge-kappa[tiktoken]` | (automatic) |
+| Output length for verbosity bias | `VerbosityBiasDetector` (reads `JudgeVerdict.output_token_count`) | none (see §9) |
 
 Run all demos without an API key:
 
@@ -448,34 +448,48 @@ No API key required. Uses `MockRankBackend` with realistic noise.
 
 ---
 
-## 9 — Accurate token counts for verbosity bias
+## 9 — Output length for verbosity bias
 
 ### Why it matters
 
-`VerbosityBiasDetector` measures whether judges reward longer outputs (Spearman ρ). The correlation depends on accurate token counts. The default whitespace-split approximation inflates counts for CJK text and deflates for code.
+`VerbosityBiasDetector` measures whether judges reward longer outputs (Spearman ρ between output length and judge score). The result is only as meaningful as the length measure, so it is worth knowing exactly what is counted.
 
-### Setup
+### What is counted
 
-```bash
-pip install "judge-kappa[tiktoken]"
-# or
-pip install "judge-kappa[all]"   # includes tiktoken
-```
+Length is `JudgeVerdict.output_token_count` of the **evaluated output** (not the judge's rationale). The built-in judges set it to the **whitespace-split word count** of that output. The unit is words, not model tokens, and no tokenizer is involved.
 
-Once installed, token counts are used automatically when judges set `output_token_count` in their verdicts. The `tiktoken_encoding` parameter selects the tokenizer:
+Spearman is rank-based, so word counts and token counts rank ordinary same-language prose almost identically, and the correlation is usually insensitive to the choice. Whitespace words are a weak proxy where it matters:
+
+| Corpus | Effect of whitespace splitting |
+|---|---|
+| CJK, Thai and other scripts written without spaces | A whole sentence counts as a few "words": lengths are compressed and ties are common, so ρ is unreliable |
+| Source code | Counts depend on formatting more than on content |
+| Mixed-language corpora | Lengths are not comparable across languages |
+
+For those corpora set `output_token_count` yourself, with the length measure you trust, in a custom judge or when building verdicts:
 
 ```python
-from judge_kappa.bias import VerbosityBiasDetector
+import tiktoken  # your own dependency, not installed by judge-kappa
 
-detector = VerbosityBiasDetector(
-    threshold=0.30,
-    tiktoken_encoding="cl100k_base",   # GPT-4, Claude-3; use "o200k_base" for GPT-4o
-)
-result = detector.detect(verdicts=verdicts)
-print(result.verbosity_bias_rho, result.verbosity_bias_p, result.verbosity_biased)
+enc = tiktoken.get_encoding("o200k_base")
+verdict.output_token_count = len(enc.encode(output))
 ```
 
-For judges that generate output, set `output_token_count` in `JudgeVerdict` using a proper tokenizer in your custom judge subclass.
+### Verdicts without a length
+
+`output_token_count == 0` means "not measured". Such verdicts are left out of the correlation, and the report says so:
+
+```python
+report.bias.verbosity_n_measured    # verdicts used
+report.bias.verbosity_n_unmeasured  # verdicts left out
+report.data_quality.warnings        # explains it when n_unmeasured > 0
+```
+
+With fewer than 3 measured verdicts no correlation is estimated and `verbosity_bias_rho` is `None`. An empty output has length 0 and is therefore also reported as unmeasured. Earlier releases silently used the word count of the judge's *rationale* for such verdicts, which measures the judge's own wordiness rather than the output's length.
+
+### Deprecated: `tiktoken_encoding` and the `tiktoken` extra
+
+`VerbosityBiasDetector(tiktoken_encoding=...)` was accepted but never used. It now emits a `DeprecationWarning` and is ignored. The `tiktoken` extra installs nothing and is no longer part of `[all]`; it remains only so existing `pip install "judge-kappa[tiktoken]"` commands keep working.
 
 ---
 

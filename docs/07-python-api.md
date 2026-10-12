@@ -535,7 +535,7 @@ for verdict in case.verdicts:
     verdict.rationale
     verdict.assertion_scores         # {"assertion text": 0.0|1.0}
     verdict.dimension_scores         # {"dim name": 0.0–1.0}
-    verdict.output_token_count
+    verdict.output_token_count       # whitespace word count of the evaluated output; 0 = not measured
 
 # Serialize
 json_str = report.model_dump_json(indent=2)
