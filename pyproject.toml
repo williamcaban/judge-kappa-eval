@@ -67,6 +67,7 @@ dev = [
     "mypy>=1.10",
     "openai>=1.30",       # stubs for type-checking llm/openai_backend.py
     "anthropic>=0.28",    # stubs for type-checking llm/anthropic_backend.py
+    "interrogate>=1.7",   # docstring-coverage gate, configured in [tool.interrogate]
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -102,6 +103,23 @@ ignore  = ["E501"]
 [tool.ruff.lint.per-file-ignores]
 "tests/**"    = ["D"]
 "examples/**" = ["D"]
+
+# Docstring coverage gate: `uv run interrogate src/judge_kappa`. Run by the required
+# "Docstring coverage" CI job and by .pre-commit-config.yaml. ruff D1 (above) only covers public
+# names and reports no figure; this counts every module, class, function and method, private,
+# dunder and nested included, and fails below 100%.
+[tool.interrogate]
+fail-under = 100
+verbose = 1
+ignore-module = false
+ignore-init-module = false
+ignore-init-method = false
+ignore-magic = false
+ignore-private = false
+ignore-semiprivate = false
+ignore-nested-functions = false
+ignore-nested-classes = false
+ignore-property-decorators = false
 
 [tool.mypy]
 strict              = true

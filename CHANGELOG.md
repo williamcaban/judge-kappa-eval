@@ -31,6 +31,10 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `data_quality.warnings` entry when verdicts were left out of the verbosity correlation.
 - `BiasResult.verbosity_not_estimated_reason` (`too_few_measured`, `constant_scores`,
   `constant_lengths`): says why `verbosity_bias_rho` is `None`.
+- **Docstring-coverage gate.** `interrogate` (`fail-under = 100`, nothing ignored) runs as a
+  required `Docstring coverage` CI job and as an optional `.pre-commit-config.yaml` hook. Unlike
+  ruff `D1` it counts private, dunder and nested callables and reports a figure. The seven nested
+  helpers that lacked a docstring now have one; no code changed.
 
 ### Deprecated
 

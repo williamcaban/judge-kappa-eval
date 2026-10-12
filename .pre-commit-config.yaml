@@ -1,0 +1,12 @@
+# Optional local hooks. Install once with:  uvx pre-commit install
+# CI runs the same check as the required "Docstring coverage" job, so skipping the hook
+# only moves the failure from your commit to your pull request.
+repos:
+  - repo: local
+    hooks:
+      - id: docstring-coverage
+        name: docstring coverage (100%)
+        entry: uv run --locked --group dev interrogate src/judge_kappa
+        language: system
+        pass_filenames: false
+        files: ^src/judge_kappa/.*\.py$
