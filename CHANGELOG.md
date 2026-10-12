@@ -9,6 +9,15 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+---
+
+## [0.4.0] — 2026-10-12
+
+> **Heads-up (behaviour change):** `agreement.alpha`, `agreement.kappa` and `agreement.icc` are now
+> `None` instead of `1.0` / `NaN` / `0.0` when they are undefined: a single judge, judges whose cases do
+> not overlap, and **identical scores**. Code that formats them (`f"{report.agreement.alpha:.3f}"`)
+> must handle `None`. Agreement with score variation is unchanged. See *Changed*.
+
 ### Changed
 
 - **Identical scores are undefined for every agreement statistic, not perfect agreement.**
@@ -36,6 +45,17 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   constant-score runs (for example `f"{report.agreement.alpha:.3f}"` raises). The examples and docs
   that did so now guard it; the CLI text report prints `n/a (<reason>)`, and a report saved before
   this change that still carries `alpha = 1.0` for one judge is not rendered as agreement.
+
+### Added
+
+- `AgreementResult.alpha_not_estimated_reason` (`single_judge`, `no_pairable_values`,
+  `no_score_variation`), `kappa_not_estimated_reason` (`no_judge_pair`, `no_score_variation`) and
+  `icc_not_estimated_reason` (`insufficient_data`, `no_score_variation`): say why a statistic is
+  `None`. Documented in `docs/10`, "When agreement cannot be estimated".
+- CI: the coverage floor is raised from 70% to 90% (enforced by `pytest --cov` in the required
+  `Test` jobs; measured coverage is about 93%), the Codecov upload is now active
+  (`CODECOV_TOKEN`) with a `codecov.yml` whose statuses are advisory, and the README carries
+  build, coverage, quality and package badges.
 
 ---
 
@@ -383,7 +403,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - 8 test modules, 60+ tests, zero real LLM calls (MockLLMBackend)
 - Coverage: models, adapters, judges (scoring math, ICL, malformed JSON), panels, agreement metrics, bias detectors, evaluator integration, CLI schema validation, key resolution
 
-[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/williamcaban/judge-kappa-eval/compare/v0.2.1...v0.3.0
