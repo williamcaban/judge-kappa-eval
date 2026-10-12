@@ -1,0 +1,21 @@
+# Codecov configuration (https://docs.codecov.com/docs/codecov-yaml).
+# The statuses below are advisory: they are not in the protect-main ruleset, so a red
+# codecov/* status does not block a merge. CI itself enforces no coverage minimum, and a
+# failed Codecov upload does not fail the job (fail_ci_if_error: false).
+coverage:
+  precision: 2
+  round: down
+  range: "85...100"
+  status:
+    project:
+      default:
+        target: auto          # compare with the base commit
+        threshold: 1%         # allow a 1% drop before the status goes red
+    patch:
+      default:
+        target: 80%           # share of the lines a PR changes that must be covered
+        threshold: 5%
+
+comment:
+  layout: "diff, files"
+  require_changes: true       # only comment when coverage moves
