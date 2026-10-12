@@ -21,6 +21,8 @@ Thresholds (Cicchetti 1994):
 
 from __future__ import annotations
 
+from typing import Literal
+
 import numpy as np
 
 from judge_kappa.models import AgreementResult, JudgeVerdict
@@ -99,7 +101,34 @@ def compute_icc(verdicts: list[JudgeVerdict]) -> tuple[float, str]:
     return round(icc, 4), _interpret_icc(icc)
 
 
+def icc_not_estimated_reason(
+    verdicts: list[JudgeVerdict],
+) -> Literal["insufficient_data", "no_score_variation"] | None:
+    """Why ICC(2,k) is undefined for these verdicts, or ``None`` when it can be estimated.
+
+    ``insufficient_data``: fewer than 2 judges or 2 cases (after dropping empty rows and
+    columns). ``no_score_variation``: every score is the same value, so the variance
+    components are all 0 and the ratio is 0/0.
+    """
+    judge_ids = sorted({v.judge_id for v in verdicts})
+    case_ids  = sorted({v.eval_case_id for v in verdicts})
+    if len(case_ids) < 2 or len(judge_ids) < 2:
+        return "insufficient_data"
+    scores = [v.score for v in verdicts]
+    if max(scores) == min(scores):
+        return "no_score_variation"
+    return None
+
+
 def enrich_agreement_with_icc(result: AgreementResult, verdicts: list[JudgeVerdict]) -> AgreementResult:
-    """Return a copy of result with icc and icc_interpretation populated."""
+    """Return a copy of result with the ICC fields populated.
+
+    When ICC is undefined (see ``icc_not_estimated_reason``) ``icc`` and ``icc_interpretation``
+    stay ``None`` and the reason is recorded, instead of the ``0.0`` / ``1.0`` that
+    ``compute_icc`` returns for those inputs, which would read as a measured reliability.
+    """
+    reason = icc_not_estimated_reason(verdicts)
+    if reason is not None:
+        return result.model_copy(update={"icc_not_estimated_reason": reason})
     icc_val, icc_interp = compute_icc(verdicts)
     return result.model_copy(update={"icc": icc_val, "icc_interpretation": icc_interp})

@@ -402,8 +402,11 @@ class TestTextReportOptionalMetrics:
         report = _report(4, [0.8, 0.8])
         assert report.agreement.kappa is None
         assert report.agreement.kappa_not_estimated_reason == "no_score_variation"
+        assert report.agreement.alpha is None
+        assert report.agreement.alpha_not_estimated_reason == "no_score_variation"
         text = _render_text(report)
         assert "n/a (judges used one and the same single score)" in _line(text, "Cohen κ")
+        assert "n/a (judges used one and the same single score)" in _line(text, "Krippendorff α")
         # the expected chance agreement is still a real number for identical scores
         assert _line(text, "Expected P(e)") == "Expected P(e):    1.0000"
         assert "nan" not in text.lower()

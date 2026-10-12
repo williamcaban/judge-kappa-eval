@@ -19,6 +19,7 @@ import warnings
 import pytest
 
 from judge_kappa.agreement.alpha import KrippendorffAlpha, _interpret
+from judge_kappa.agreement.icc import enrich_agreement_with_icc, icc_not_estimated_reason
 from judge_kappa.agreement.kappa import CohenKappa
 from judge_kappa.models import ScaleType
 from tests.conftest import make_verdict
@@ -258,13 +259,38 @@ class TestUndefinedAlpha:
         assert result.alpha_not_estimated_reason == "no_pairable_values"
         assert result.n_judges == 2
 
-    def test_identical_constant_scores_keep_the_documented_convention(self):
+    def test_identical_scores_are_not_estimated(self):
+        # Observed and expected disagreement are both 0, so alpha is 0/0. It used to be
+        # reported as 1.0 ("strong agreement") for judges that merely never varied.
         v = _verdicts({
             "j1": {"c1": 0.8, "c2": 0.8, "c3": 0.8},
             "j2": {"c1": 0.8, "c2": 0.8, "c3": 0.8},
         })
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            result = KrippendorffAlpha().compute(v, ScaleType.ORDINAL)
+        assert result.alpha is None
+        assert result.alpha_not_estimated_reason == "no_score_variation"
+        assert result.alpha_interpretation is None
+        assert result.n_judges == 2 and result.n_cases == 3
+
+    def test_identical_scores_report_the_same_reason_for_alpha_and_kappa(self):
+        v = _verdicts({
+            "j1": {"c1": 0.5, "c2": 0.5, "c3": 0.5},
+            "j2": {"c1": 0.5, "c2": 0.5, "c3": 0.5},
+        })
+        a = KrippendorffAlpha().compute(v, ScaleType.ORDINAL)
+        k = CohenKappa().compute(v, ScaleType.ORDINAL)
+        assert a.alpha is None and k.kappa is None
+        assert a.alpha_not_estimated_reason == k.kappa_not_estimated_reason == "no_score_variation"
+
+    def test_agreement_with_score_variation_is_still_one(self):
+        v = _verdicts({
+            "j1": {"c1": 0.1, "c2": 0.5, "c3": 0.9},
+            "j2": {"c1": 0.1, "c2": 0.5, "c3": 0.9},
+        })
         result = KrippendorffAlpha().compute(v, ScaleType.ORDINAL)
-        assert result.alpha == 1.0
+        assert result.alpha == pytest.approx(1.0)
         assert result.alpha_not_estimated_reason is None
 
     def test_one_shared_case_is_enough_to_estimate(self):
@@ -347,4 +373,52 @@ class TestUndefinedKappa:
         })
         assert r.kappa == pytest.approx(1.0)
         assert r.kappa_not_estimated_reason is None
+
+
+class TestUndefinedIcc:
+    """The report layer must not turn 0/0 or too little data into a reliability figure."""
+
+    @staticmethod
+    def _enrich(by_judge):
+        from judge_kappa.models import AgreementResult
+
+        return enrich_agreement_with_icc(AgreementResult(), _verdicts(by_judge))
+
+    def test_identical_scores_are_not_estimated(self):
+        r = self._enrich({
+            "j1": {"c1": 0.7, "c2": 0.7, "c3": 0.7},
+            "j2": {"c1": 0.7, "c2": 0.7, "c3": 0.7},
+        })
+        assert r.icc is None and r.icc_interpretation is None
+        assert r.icc_not_estimated_reason == "no_score_variation"
+
+    def test_single_judge_is_insufficient_data_not_zero(self):
+        r = self._enrich({"j1": {"c1": 0.1, "c2": 0.5, "c3": 0.9}})
+        assert r.icc is None
+        assert r.icc_not_estimated_reason == "insufficient_data"
+
+    def test_single_case_is_insufficient_data(self):
+        r = self._enrich({"j1": {"c1": 0.1}, "j2": {"c1": 0.9}})
+        assert r.icc_not_estimated_reason == "insufficient_data"
+
+    def test_ordinary_agreement_is_unchanged(self):
+        r = self._enrich({
+            "j1": {"c1": 0.1, "c2": 0.5, "c3": 0.9},
+            "j2": {"c1": 0.2, "c2": 0.5, "c3": 0.8},
+        })
+        assert r.icc is not None and r.icc > 0.9
+        assert r.icc_not_estimated_reason is None
+
+    def test_direct_compute_icc_keeps_its_return_convention(self):
+        # compute_icc() itself is unchanged; the policy lives in the report layer.
+        from judge_kappa.agreement.icc import compute_icc
+
+        icc, _ = compute_icc(_verdicts({
+            "j1": {"c1": 0.7, "c2": 0.7, "c3": 0.7},
+            "j2": {"c1": 0.7, "c2": 0.7, "c3": 0.7},
+        }))
+        assert icc == 1.0
+
+    def test_reason_helper(self):
+        assert icc_not_estimated_reason([]) == "insufficient_data"
 

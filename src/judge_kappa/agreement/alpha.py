@@ -31,6 +31,7 @@ from judge_kappa.models import AgreementResult, JudgeVerdict, ScaleType
 ALPHA_NOT_ESTIMATED_TEXT: dict[str, str] = {
     "single_judge": "needs at least 2 judges",
     "no_pairable_values": "no case was scored by 2 or more judges",
+    "no_score_variation": "judges used one and the same single score",
 }
 
 
@@ -93,9 +94,9 @@ class KrippendorffAlpha(AgreementMetric):
         Returns:
             An ``AgreementResult`` with ``alpha``, its interpretation, the optional interval and
             the judge and case counts. Alpha is ``None`` (with ``alpha_not_estimated_reason``)
-            when no case was scored by 2 or more judges: a single judge, or judges whose cases do
-            not overlap. When such cases exist and the judges all gave one identical score the
-            domain has a single value and agreement is taken as perfect (alpha = 1.0).
+            when it is undefined: ``single_judge`` or ``no_pairable_values`` when no case was
+            scored by 2 or more judges, and ``no_score_variation`` when every score is the same
+            value (observed and expected disagreement are both 0, so alpha is 0/0).
         """
         judge_ids = sorted({v.judge_id for v in verdicts})
         case_ids  = sorted({v.eval_case_id for v in verdicts})
@@ -121,8 +122,13 @@ class KrippendorffAlpha(AgreementMetric):
             ))
         except ValueError:
             # With pairable cases present the only ValueError left is the single-value domain:
-            # every judge gave the same score → treated as perfect agreement
-            alpha = 1.0
+            # every judge gave the same score, so alpha is 0/0. Report it as undefined rather
+            # than as perfect agreement, which would claim a reliability nobody demonstrated.
+            return AgreementResult(
+                alpha_not_estimated_reason="no_score_variation",
+                n_judges=len(judge_ids),
+                n_cases=len(case_ids),
+            )
 
         ci_low, ci_high = None, None
         if self._bootstrap_ci and len(case_ids) >= 5:

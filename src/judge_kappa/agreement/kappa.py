@@ -27,7 +27,7 @@ _DISCRETIZE_BINS = 5  # 0.0–1.0 continuous score → 5 ordinal buckets
 # Short text for AgreementResult.kappa_not_estimated_reason (CLI report).
 KAPPA_NOT_ESTIMATED_TEXT: dict[str, str] = {
     "no_judge_pair": "needs at least 2 judges and 2 shared cases",
-    "no_score_variation": "judges used one and the same single score",
+    "no_score_variation": "judges used one and the same single score",  # as for alpha
 }
 
 

@@ -348,3 +348,41 @@ class TestDIF:
         verdicts = self._case_verdicts("c1", [0.3, 0.4], [0.6, 0.7])  # 4 total < default min of 4? equals
         report = DifferentialItemFunctioningDetector(min_verdicts_per_case=8).analyze(verdicts)
         assert report.per_case == []
+
+
+class TestBehavioralAlignmentUndefinedAlpha:
+    """Undefined alpha must say why, not collapse into a generic "insufficient data"."""
+
+    def test_identical_scores_under_every_condition(self):
+        from judge_kappa.agreement import BehavioralAlignmentMetric
+
+        v = BehavioralAlignmentMetric.from_condition_scores({
+            "zero_shot": {"c1": 0.6, "c2": 0.6, "c3": 0.6},
+            "system_prompted": {"c1": 0.6, "c2": 0.6, "c3": 0.6},
+        })
+        r = BehavioralAlignmentMetric(bootstrap_ci=False).compute(v)
+        assert r.alpha is None
+        assert r.alpha_not_estimated_reason == "no_score_variation"
+        assert r.alpha_interpretation == "not estimated: judges used one and the same single score"
+
+    def test_single_condition(self):
+        from judge_kappa.agreement import BehavioralAlignmentMetric
+
+        v = BehavioralAlignmentMetric.from_condition_scores(
+            {"zero_shot": {"c1": 0.2, "c2": 0.6, "c3": 0.9}}
+        )
+        r = BehavioralAlignmentMetric(bootstrap_ci=False).compute(v)
+        assert r.alpha is None
+        assert r.alpha_interpretation == "not estimated: needs at least 2 judges"
+
+    def test_consistent_conditions_with_variation_are_still_consistent(self):
+        from judge_kappa.agreement import BehavioralAlignmentMetric
+
+        v = BehavioralAlignmentMetric.from_condition_scores({
+            "zero_shot": {"c1": 0.2, "c2": 0.6, "c3": 0.9},
+            "system_prompted": {"c1": 0.2, "c2": 0.6, "c3": 0.9},
+        })
+        r = BehavioralAlignmentMetric(bootstrap_ci=False).compute(v)
+        assert r.alpha == 1.0
+        assert "behaviorally consistent" in (r.alpha_interpretation or "")
+

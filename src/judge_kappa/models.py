@@ -192,10 +192,16 @@ class AgreementResult(BaseModel):
     n_judges: int = 0
     n_cases: int = 0
     # Why alpha / kappa are None. None here means the statistic was estimated. Krippendorff's alpha
-    # needs at least one case scored by 2 or more judges; Cohen's kappa needs a judge pair sharing
-    # 2 cases and is undefined when every compared pair used one and the same single category.
-    alpha_not_estimated_reason: Literal["single_judge", "no_pairable_values"] | None = None
+    # needs at least one case scored by 2 or more judges and some variation in the scores; Cohen's
+    # kappa needs a judge pair sharing 2 cases and is undefined when every compared pair used one
+    # and the same single category. Identical scores make both 0/0, so both report
+    # "no_score_variation" rather than a made-up 1.0.
+    alpha_not_estimated_reason: (
+        Literal["single_judge", "no_pairable_values", "no_score_variation"] | None
+    ) = None
     kappa_not_estimated_reason: Literal["no_judge_pair", "no_score_variation"] | None = None
+    # ICC(2,k) needs at least 2 judges and 2 cases, and some variation in the scores.
+    icc_not_estimated_reason: Literal["insufficient_data", "no_score_variation"] | None = None
 
 
 class JudgeFitResult(BaseModel):

@@ -29,7 +29,7 @@ Usage:
 
 from __future__ import annotations
 
-from judge_kappa.agreement.alpha import KrippendorffAlpha
+from judge_kappa.agreement.alpha import ALPHA_NOT_ESTIMATED_TEXT, KrippendorffAlpha
 from judge_kappa.models import AgreementResult, JudgeVerdict, ScaleType
 
 
@@ -67,14 +67,16 @@ class BehavioralAlignmentMetric:
 
         Returns:
             The ``AgreementResult`` from ``KrippendorffAlpha`` with ``alpha_interpretation`` worded
-            for cross-condition consistency (or ``"insufficient data"``).
+            for cross-condition consistency. When alpha is undefined the interpretation says why
+            (for example identical scores under every condition) and ``alpha`` is ``None``.
         """
         result = self._alpha_metric.compute(verdicts, scale_type)
-        interp = (
-            _interpret_behavioral(result.alpha or 0.0)
-            if result.alpha is not None
-            else "insufficient data"
-        )
+        if result.alpha is not None:
+            interp = _interpret_behavioral(result.alpha)
+        else:
+            reason = result.alpha_not_estimated_reason
+            why = ALPHA_NOT_ESTIMATED_TEXT.get(reason or "", "insufficient data")
+            interp = f"not estimated: {why}"
         return result.model_copy(update={"alpha_interpretation": interp})
 
     @staticmethod

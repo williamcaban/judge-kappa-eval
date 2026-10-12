@@ -135,6 +135,23 @@ class TestJuryEvaluatorEvaluate:
         assert report.agreement.kappa_not_estimated_reason is None
         assert report.agreement.n_judges == 2
 
+    def test_identical_scores_are_reported_as_not_estimated_at_every_level(self):
+        cases = [_make_case(f"c{i}", ["A"]) for i in range(3)]
+        ev, _ = _make_evaluator([_assertion_resp({"A": 0.8})], n_judges=2)
+        ctrl = Variant(name="control",   predict_fn=lambda _: "ctrl")
+        trt  = Variant(name="treatment", predict_fn=lambda _: "trt")
+        report = ev.evaluate(cases, ctrl, trt)
+        a = report.agreement
+        assert a.alpha is None and a.alpha_not_estimated_reason == "no_score_variation"
+        assert a.kappa is None and a.kappa_not_estimated_reason == "no_score_variation"
+        # ICC(2,k) is the third agreement statistic and must not contradict the other two.
+        assert a.icc is None and a.icc_not_estimated_reason == "no_score_variation"
+        # Per case too: a case on which the judges agree exactly has no alpha, not 1.0.
+        assert all(c.agreement.alpha is None for c in report.cases)
+        payload = json.loads(report.model_dump_json())["agreement"]
+        assert payload["alpha"] is None and payload["kappa"] is None
+        assert payload["alpha_not_estimated_reason"] == "no_score_variation"
+
     def test_single_judge_agreement_is_reported_as_not_estimated(self):
         cases = [_make_case(f"c{i}", ["A"]) for i in range(3)]
         ev, _ = _make_evaluator([_assertion_resp({"A": 0.8})], n_judges=1)
