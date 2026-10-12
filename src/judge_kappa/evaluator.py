@@ -286,7 +286,9 @@ class JuryEvaluator:
         cases = DatasetAdapter().load(data)
 
         def _make_prerecorded_fn(field: str) -> Callable[..., str]:
+            """Build a predict_fn that returns the pre-recorded output stored under ``field``."""
             def _fn(inputs: dict[str, object]) -> str:
+                """Return the output recorded under ``field``, falling back to ``output``."""
                 return str(inputs.get(field) or inputs.get("output") or "")
             return _fn
 
@@ -338,6 +340,7 @@ class JuryEvaluator:
         run_state = begin_run(judges=[pairwise_judge])
 
         def _judge_row(item: tuple[int, dict[str, object]]) -> PairwiseCaseResult:
+            """Judge one ``(index, row)`` pair and build its ``PairwiseCaseResult``."""
             i, row = item
             inputs_obj = row.get("inputs", {})
             inputs: dict[str, object] = inputs_obj if isinstance(inputs_obj, dict) else {}

@@ -79,6 +79,7 @@ def begin_run(
     tracks: dict[int, _Track] = {}
 
     def _add(role: str, backend: object, judge_id: str | None) -> None:
+        """Track ``backend`` once, keeping a judge role and the ids of the judges using it."""
         key = id(backend)
         track = tracks.get(key)
         if track is None:

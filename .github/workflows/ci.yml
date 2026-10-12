@@ -56,6 +56,29 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+  docstring-coverage:
+    # Every module, class, function and method in src/judge_kappa must have a docstring, private,
+    # dunder and nested ones included (interrogate, fail-under = 100 in pyproject.toml). The ruff
+    # D1 rules in the lint step only cover public names and report no coverage figure.
+    if: github.event_name != 'schedule'
+    name: Docstring coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.12.19"
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Docstring coverage (interrogate)
+        run: uv run interrogate src/judge_kappa
+
   validate-configs:
     if: github.event_name != 'schedule'
     name: Validate example configs

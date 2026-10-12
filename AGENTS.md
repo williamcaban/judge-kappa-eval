@@ -233,6 +233,7 @@ git checkout -b release/vX.Y.Z          # version bump
 Open a PR to `main`. Branch protection requires all CI jobs to pass before merge:
 - `Test Python 3.12`
 - `Test Python 3.13`
+- `Docstring coverage`
 - `Validate example configs`
 
 ### 6.2 — Mandatory quality gates (must pass before opening a PR)
@@ -242,11 +243,18 @@ Run the following locally from the repo root. All must be clean:
 ```bash
 uv run ruff check src tests     # zero errors — "All checks passed!" (includes the missing-docstring rules D1)
 uv run mypy src                 # zero errors — "Success: no issues found"
+uv run interrogate src/judge_kappa   # docstring coverage must be 100% (every callable, nested included)
 uv run pytest                   # zero failures
 uv run judge-kappa validate examples/config_*.yaml   # all configs valid
 ```
 
 The pre-push hook (`.git/hooks/pre-push`) runs these automatically.
+
+Docstring coverage is also available as a pre-commit hook: `uvx pre-commit install` registers
+`.pre-commit-config.yaml`, which runs `interrogate` when files under `src/judge_kappa/` change.
+Every module, class, function and method needs a docstring, including private, dunder and nested
+ones; a one-line docstring is enough. `ruff` D1 covers only public names, so `interrogate` is the
+gate that reports the figure.
 
 **CI will reject PRs that fail any of these checks.** Do not open a PR until all gates pass locally.
 

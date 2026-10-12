@@ -111,6 +111,7 @@ class RankJudge(LLMJudge):
         n = len(names)
 
         def _validate_rankings(data: dict[str, Any]) -> str | None:
+            """Return an error code unless ``rankings`` is a full 1..n ranking, else None."""
             ranks = data["rankings"]
             if not isinstance(ranks, dict):
                 return "rankings_not_an_object"

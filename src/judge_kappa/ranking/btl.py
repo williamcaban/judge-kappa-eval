@@ -207,6 +207,7 @@ def _solve(
     ci, cj, ca, cn, cy = cells.i, cells.j, cells.a, cells.n, cells.y
 
     def fun(theta: FloatArray) -> tuple[float, FloatArray]:
+        """Penalised negative log-likelihood and its gradient at ``theta``."""
         s = theta[:n_items]
         eta = s[ci] - s[cj]
         if with_order:
