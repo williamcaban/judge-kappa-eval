@@ -1,7 +1,8 @@
 # Codecov configuration (https://docs.codecov.com/docs/codecov-yaml).
 # The statuses below are advisory: they are not in the protect-main ruleset, so a red
-# codecov/* status does not block a merge. CI itself enforces no coverage minimum, and a
-# failed Codecov upload does not fail the job (fail_ci_if_error: false).
+# codecov/* status does not block a merge. The enforced coverage gate is the floor in
+# pyproject.toml ([tool.coverage.report] fail_under), checked by `pytest --cov` in the required
+# Test jobs. A failed Codecov upload does not fail the job (fail_ci_if_error: false).
 coverage:
   precision: 2
   round: down
