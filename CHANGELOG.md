@@ -18,11 +18,19 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   judges always record the output's word count, so their numbers do not move (an empty output has
   length 0 and is now reported as unmeasured). Custom judges that never set `output_token_count`
   previously got a rationale-based figure and now get no estimate plus a warning.
+- **`verbosity_bias_rho` / `verbosity_bias_p` are `None`, not `NaN`, when the correlation is
+  undefined** (all scores identical, all lengths identical, or fewer than 3 measured verdicts).
+  `spearmanr` used to be called on the constant vector, returned `NaN` and emitted a SciPy
+  `ConstantInputWarning` that never reached the report; `model_dump()` held `nan` while the JSON
+  held `null`. The call is now skipped. `verbosity_biased` is `False` in these cases, so check
+  `verbosity_bias_rho is None` first. The CLI text report prints `not estimated (<reason>)`.
 
 ### Added
 
 - `BiasResult.verbosity_n_measured` and `BiasResult.verbosity_n_unmeasured`, and a
   `data_quality.warnings` entry when verdicts were left out of the verbosity correlation.
+- `BiasResult.verbosity_not_estimated_reason` (`too_few_measured`, `constant_scores`,
+  `constant_lengths`): says why `verbosity_bias_rho` is `None`.
 
 ### Deprecated
 

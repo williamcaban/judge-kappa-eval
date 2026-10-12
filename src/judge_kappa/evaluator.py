@@ -43,7 +43,7 @@ from judge_kappa.agreement.icc import enrich_agreement_with_icc
 from judge_kappa.agreement.kappa import CohenKappa
 from judge_kappa.agreement.personfit import PersonFitAnalyzer
 from judge_kappa.bias.positional import PositionalBiasDetector, PositionalBiasReport
-from judge_kappa.bias.verbosity import VerbosityBiasDetector
+from judge_kappa.bias.verbosity import NOT_ESTIMATED_TEXT, VerbosityBiasDetector
 from judge_kappa.concurrency import ordered_map, validate_max_workers
 from judge_kappa.judges.pairwise import PairwiseJudge
 from judge_kappa.llm.base import LLMBackend, call_backend
@@ -512,6 +512,7 @@ class JuryEvaluator:
             verbosity_biased=verb_bias.verbosity_biased,
             verbosity_n_measured=verb_bias.verbosity_n_measured,
             verbosity_n_unmeasured=verb_bias.verbosity_n_unmeasured,
+            verbosity_not_estimated_reason=verb_bias.verbosity_not_estimated_reason,
         )
 
         # McNemar significance test + bootstrap CI for mean uplift
@@ -533,19 +534,23 @@ class JuryEvaluator:
             replies += [
                 (self._positional_judge.judge_id, r.parse_error, r.truncated) for r in pos_reports
             ]
+        # Only missing length data is a data-quality problem. Identical scores or lengths are
+        # a property of the data (reported through bias.verbosity_not_estimated_reason and the
+        # CLI line), and are legitimate, e.g. for single-token answers.
         length_warnings: list[str] = []
         if verb_bias.verbosity_n_unmeasured:
-            length_warnings.append(
+            text = (
                 f"{verb_bias.verbosity_n_unmeasured} of {len(all_verdicts)} verdicts have no "
                 "output length (output_token_count == 0) and were left out of the "
-                f"verbosity-bias correlation ({verb_bias.verbosity_n_measured} measured)"
-                + (
-                    "; too few remain, so verbosity bias was not estimated."
-                    if verb_bias.verbosity_bias_rho is None
-                    else "."
-                )
-                + " Built-in judges set the length; custom judges must set output_token_count."
+                f"verbosity-bias correlation ({verb_bias.verbosity_n_measured} measured)."
             )
+            if verb_bias.verbosity_not_estimated_reason == "too_few_measured":
+                text += (
+                    " Verbosity bias was not estimated: "
+                    f"{NOT_ESTIMATED_TEXT['too_few_measured']}."
+                )
+            text += " Built-in judges set the length; custom judges must set output_token_count."
+            length_warnings.append(text)
         data_quality = compute_data_quality(
             replies,
             extra_truncated=generation_truncations(run_state),

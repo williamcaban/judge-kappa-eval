@@ -21,7 +21,7 @@ or length measure you trust, in a custom judge or when building verdicts.
 from __future__ import annotations
 
 import warnings
-from typing import Any
+from typing import Any, Literal
 
 from scipy import stats
 
@@ -29,6 +29,13 @@ from judge_kappa.bias.base import BiasDetector
 from judge_kappa.models import BiasResult, JudgeVerdict
 
 _MIN_MEASURED = 3
+
+# Short, human-readable text for BiasResult.verbosity_not_estimated_reason (CLI, warnings).
+NOT_ESTIMATED_TEXT: dict[str, str] = {
+    "too_few_measured": f"fewer than {_MIN_MEASURED} verdicts with a measured output length",
+    "constant_scores": "all judge scores are identical",
+    "constant_lengths": "all outputs have the same length",
+}
 
 
 class VerbosityBiasDetector(BiasDetector):
@@ -67,8 +74,10 @@ class VerbosityBiasDetector(BiasDetector):
             ``BiasResult`` with Spearman rho, its p-value and ``verbosity_biased`` (|rho| above
             the threshold and p < 0.05). Only verdicts with ``output_token_count > 0`` are
             used; ``verbosity_n_measured`` and ``verbosity_n_unmeasured`` report how many were
-            and were not. With fewer than 3 measured verdicts no correlation is estimated and
-            ``verbosity_bias_rho`` stays ``None``.
+            and were not. When no correlation can be estimated (fewer than 3 measured
+            verdicts, identical scores, or identical lengths) ``verbosity_bias_rho`` and
+            ``verbosity_bias_p`` are ``None``, ``verbosity_biased`` is ``False`` and
+            ``verbosity_not_estimated_reason`` says why. Identical scores are checked first.
         """
         verdicts: list[JudgeVerdict] = kwargs["verdicts"]
 
@@ -76,14 +85,26 @@ class VerbosityBiasDetector(BiasDetector):
         n_measured = len(measured)
         n_unmeasured = len(verdicts) - n_measured
 
+        lengths = [v.output_token_count for v in measured]
+        scores = [v.score for v in measured]
+
+        reason: Literal["too_few_measured", "constant_scores", "constant_lengths"] | None = None
         if n_measured < _MIN_MEASURED:
+            reason = "too_few_measured"
+        elif len(set(scores)) < 2:
+            reason = "constant_scores"
+        elif len(set(lengths)) < 2:
+            reason = "constant_lengths"
+        if reason is not None:
+            # A rank correlation is undefined on a constant vector; do not call spearmanr
+            # (it returns NaN and warns) and do not report 0.0, which would assert "no bias".
             return BiasResult(
-                verbosity_n_measured=n_measured, verbosity_n_unmeasured=n_unmeasured
+                verbosity_n_measured=n_measured,
+                verbosity_n_unmeasured=n_unmeasured,
+                verbosity_not_estimated_reason=reason,
             )
 
-        result = stats.spearmanr(
-            [v.output_token_count for v in measured], [v.score for v in measured]
-        )
+        result = stats.spearmanr(lengths, scores)
         rho_f = float(result.statistic)
         p_f   = float(result.pvalue)
         biased = abs(rho_f) > self._threshold and p_f < 0.05

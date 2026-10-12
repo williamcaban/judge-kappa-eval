@@ -485,7 +485,19 @@ report.bias.verbosity_n_unmeasured  # verdicts left out
 report.data_quality.warnings        # explains it when n_unmeasured > 0
 ```
 
-With fewer than 3 measured verdicts no correlation is estimated and `verbosity_bias_rho` is `None`. An empty output has length 0 and is therefore also reported as unmeasured. Earlier releases silently used the word count of the judge's *rationale* for such verdicts, which measures the judge's own wordiness rather than the output's length.
+An empty output has length 0 and is therefore also reported as unmeasured. Earlier releases silently used the word count of the judge's *rationale* for such verdicts, which measures the judge's own wordiness rather than the output's length.
+
+### When the correlation cannot be estimated
+
+A rank correlation is undefined when one of the two series does not vary, and is not reported on fewer than 3 points. In those cases `verbosity_bias_rho` and `verbosity_bias_p` are `None` (never `NaN`, and never `0.0`, which would assert "no association"), and `verbosity_not_estimated_reason` says why:
+
+| `verbosity_not_estimated_reason` | Meaning | Typical cause |
+|---|---|---|
+| `too_few_measured` | Fewer than 3 verdicts with a measured length | Tiny runs; outputs with no recorded length |
+| `constant_scores` | Every measured verdict has the same score | A judge at the ceiling on a pass/fail rubric |
+| `constant_lengths` | Every measured output has the same length | Single-token or fixed-format answers |
+
+`verbosity_biased` is `False` in every one of these cases, so **check `verbosity_bias_rho is None` before reading `False` as "no bias detected"**. If both series are constant, `constant_scores` is reported. The CLI text report prints `not estimated (<reason>)`. Only missing length data adds a `data_quality.warnings` entry; identical scores or lengths are a property of the data and a clean run stays clean.
 
 ### Deprecated: `tiktoken_encoding` and the `tiktoken` extra
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import math
+import warnings
 
 import pytest
 
@@ -223,6 +224,7 @@ class TestVerbosityLengthSemantics:
         assert result.verbosity_biased is False
         assert result.verbosity_n_measured == 0
         assert result.verbosity_n_unmeasured == 10
+        assert result.verbosity_not_estimated_reason == "too_few_measured"
 
     def test_unmeasured_verdicts_are_excluded_and_counted(self):
         measured = [self._verdict(f"m{i}", score=i / 10, tokens=i * 20) for i in range(1, 9)]
@@ -245,6 +247,7 @@ class TestVerbosityLengthSemantics:
         result = VerbosityBiasDetector().detect(verdicts=verdicts)
         assert result.verbosity_bias_rho is None
         assert (result.verbosity_n_measured, result.verbosity_n_unmeasured) == (2, 5)
+        assert result.verbosity_not_estimated_reason == "too_few_measured"
 
     def test_all_measured_reports_zero_unmeasured(self):
         verdicts = [make_verdict("j1", f"c{i}", i / 10, token_count=i * 10) for i in range(1, 8)]
@@ -284,3 +287,49 @@ class TestVerbosityLengthSemantics:
             )
         ]
         assert offenders == []
+
+
+class TestVerbosityNotEstimated:
+    """A rank correlation is undefined on a constant vector: report None and why, never NaN."""
+
+    @staticmethod
+    def _detect(scores: list[float], lengths: list[int]) -> BiasResult:
+        verdicts = [
+            make_verdict("j1", f"c{i}", score=s, token_count=n)
+            for i, (s, n) in enumerate(zip(scores, lengths, strict=True))
+        ]
+        # Any SciPy ConstantInputWarning (or other warning) is a failure here: the detector
+        # must not call spearmanr on a constant vector.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            return VerbosityBiasDetector().detect(verdicts=verdicts)
+
+    @pytest.mark.parametrize(
+        ("scores", "lengths", "reason"),
+        [
+            ([1.0] * 8, [10, 20, 30, 40, 50, 60, 70, 80], "constant_scores"),
+            ([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8], [50] * 8, "constant_lengths"),
+            ([0.5] * 8, [50] * 8, "constant_scores"),
+            ([0.2, 0.9], [10, 20], "too_few_measured"),
+        ],
+    )
+    def test_undefined_correlation_is_none_with_a_reason(self, scores, lengths, reason):
+        r = self._detect(scores, lengths)
+        assert r.verbosity_bias_rho is None
+        assert r.verbosity_bias_p is None
+        assert r.verbosity_biased is False
+        assert r.verbosity_not_estimated_reason == reason
+
+    def test_estimated_result_has_no_reason(self):
+        r = self._detect([i / 10 for i in range(1, 9)], [i * 10 for i in range(1, 9)])
+        assert r.verbosity_bias_rho is not None
+        assert r.verbosity_not_estimated_reason is None
+
+    def test_python_object_and_json_agree(self):
+        r = self._detect([1.0] * 6, [10, 20, 30, 40, 50, 60])
+        assert r.model_dump()["verbosity_bias_rho"] is None
+        payload = json.loads(r.model_dump_json())
+        assert payload["verbosity_bias_rho"] is None
+        assert payload["verbosity_not_estimated_reason"] == "constant_scores"
+        assert not any(isinstance(v, float) and math.isnan(v) for v in r.model_dump().values())
+
