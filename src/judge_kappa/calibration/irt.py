@@ -49,6 +49,7 @@ from scipy.optimize import minimize
 
 
 def _sigmoid(x: np.ndarray) -> np.ndarray:
+    """Logistic function 1 / (1 + exp(-x)), element-wise."""
     return 1.0 / (1.0 + np.exp(-x))
 
 
@@ -111,6 +112,7 @@ class IRTJudgeWeighter:
         prior_b_sigma: float = 2.0,
         max_iter: int = 1000,
     ) -> None:
+        """Configure the fit; see the class docstring for each argument."""
         self._tolerance = tolerance
         self._prior_a = prior_a_sigma
         self._prior_b = prior_b_sigma
@@ -215,5 +217,6 @@ class IRTJudgeWeighter:
         ]
 
     def _check_fitted(self) -> None:
+        """Raise ``RuntimeError`` unless ``fit()`` has run."""
         if not self._fitted:
             raise RuntimeError("Call fit() before accessing results.")

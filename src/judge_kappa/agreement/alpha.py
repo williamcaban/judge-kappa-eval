@@ -29,6 +29,7 @@ from judge_kappa.models import AgreementResult, JudgeVerdict, ScaleType
 
 
 def _interpret(alpha: float) -> str:
+    """Map an alpha value to its Krippendorff (2004) reliability band."""
     if alpha >= 0.80:
         return "strong agreement (α ≥ 0.80)"
     elif alpha >= 0.67:
@@ -55,7 +56,19 @@ def _build_matrix(
 
 
 class KrippendorffAlpha(AgreementMetric):
+    """Krippendorff's alpha over a judge x case score matrix, with an optional bootstrap interval.
+
+    Tolerates missing cells (a judge that did not score a case) and supports nominal, ordinal,
+    interval and ratio scales.
+    """
     def __init__(self, bootstrap_ci: bool = True, n_bootstrap: int = 2000, seed: int = 42) -> None:
+        """Configure the metric.
+
+        Args:
+            bootstrap_ci: Compute a 95% percentile interval (needs at least 5 cases).
+            n_bootstrap: Number of case resamples for the interval.
+            seed: RNG seed, so the interval is reproducible.
+        """
         self._bootstrap_ci = bootstrap_ci
         self._n_bootstrap = n_bootstrap
         self._seed = seed
@@ -65,6 +78,17 @@ class KrippendorffAlpha(AgreementMetric):
         verdicts: list[JudgeVerdict],
         scale_type: ScaleType = ScaleType.ORDINAL,
     ) -> AgreementResult:
+        """Compute alpha for a set of verdicts.
+
+        Args:
+            verdicts: One verdict per (judge, case).
+            scale_type: Measurement scale, which selects the distance function.
+
+        Returns:
+            An ``AgreementResult`` with ``alpha``, its interpretation, the optional interval and
+            the judge and case counts. A score domain with a single value (all judges identical)
+            is treated as perfect agreement (alpha = 1.0).
+        """
         judge_ids = sorted({v.judge_id for v in verdicts})
         case_ids  = sorted({v.eval_case_id for v in verdicts})
 
@@ -100,6 +124,13 @@ class KrippendorffAlpha(AgreementMetric):
         scale_type: ScaleType,
         n_cases: int,
     ) -> tuple[float, float]:
+        """Percentile 95% bootstrap interval for alpha, resampling cases with replacement.
+
+        Resamples for which alpha is undefined are skipped.
+
+        Returns:
+            ``(low, high)`` rounded to 4 places, or ``(None, None)`` when no resample was valid.
+        """
         rng = np.random.default_rng(self._seed)
         boot_alphas: list[float] = []
         for _ in range(self._n_bootstrap):

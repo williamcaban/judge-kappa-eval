@@ -34,6 +34,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CLI text report prints data-quality warnings and a usage line. YAML judges accept
   `on_parse_failure: flag | raise`; a `raise` stops the CLI with a one-line error.
 - `docs/12-reliability-and-reproducibility.md` and `examples/demo_reliability_controls.py`.
+- Docstrings on every module, class, function and method in `src/judge_kappa` (previously
+  about 40% of callables), enforced from now on by ruff's missing-docstring rules (`D1`).
+  Documentation only: the code is unchanged.
 - Guard tests (`tests/test_naming.py`): no stale package name in shipped text, every
   `from judge_kappa import ...` in `examples/` resolves, and CLI usage names the installed
   command.

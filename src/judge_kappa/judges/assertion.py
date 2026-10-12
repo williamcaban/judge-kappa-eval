@@ -28,7 +28,16 @@ _SYSTEM = textwrap.dedent("""\
 
 
 class AssertionJudge(LLMJudge):
+    """Scores each assertion PASS (1.0) or FAIL (0.0); the verdict is the weight-averaged result."""
     def judge(self, case: EvalCase, output: str, variant_name: str) -> JudgeVerdict:
+        """Judge one output against the case's assertions.
+
+        Unusable replies are flagged on the verdict (``parse_failed``) and handled per the judge's
+        ``on_parse_failure`` policy.
+
+        Raises:
+            ValueError: If the case has no assertions.
+        """
         if not case.assertions:
             raise ValueError(f"Case '{case.id}' has no assertions for AssertionJudge.")
 

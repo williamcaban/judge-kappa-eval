@@ -9,6 +9,8 @@ from judge_kappa.models import EvalCase, JudgeVerdict
 
 
 class EvaluationPanel(ABC):
+    """Abstract base for combining judges; swap a panel for a jury without changing the evaluator.
+    """
     @abstractmethod
     def evaluate(
         self, case: EvalCase, output: str, variant_name: str
@@ -24,6 +26,7 @@ class EvaluationPanel(ABC):
     @property
     @abstractmethod
     def judge_ids(self) -> list[str]:
+        """Ids of the panel's judges, in evaluation order."""
         ...
 
     @property

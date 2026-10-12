@@ -41,6 +41,7 @@ def _as_score(value: object, default: float) -> float:
 
 
 def _validate_pair(data: dict[str, Any]) -> str | None:
+    """Error code if ``score_a`` / ``score_b`` are not finite numbers in [0, 1], else None."""
     for key in ("score_a", "score_b"):
         v = data[key]
         if not is_finite_number(v):
@@ -52,6 +53,7 @@ def _validate_pair(data: dict[str, Any]) -> str | None:
 
 @dataclass
 class PairwiseScore:
+    """Parsed pairwise reply: scores for A and B, preferred label, rationale."""
     score_a: float
     score_b: float
     preferred: str  # "A", "B", or "tie"
@@ -59,7 +61,12 @@ class PairwiseScore:
 
 
 class PairwiseJudge(LLMJudge):
+    """Compares two outputs in a single prompt; use ``judge_pair()``.
+
+    The basis of the positional-bias swap test and of tournaments.
+    """
     def judge(self, case: EvalCase, output: str, variant_name: str) -> JudgeVerdict:
+        """Not supported: raises ``NotImplementedError``; use ``judge_pair``."""
         raise NotImplementedError(
             "PairwiseJudge uses judge_pair(). Use AssertionJudge or RubricJudge "
             "for single-output scoring."
@@ -73,6 +80,19 @@ class PairwiseJudge(LLMJudge):
         label_a: str = "A",
         label_b: str = "B",
     ) -> tuple[JudgeVerdict, JudgeVerdict]:
+        """Judge outputs A and B together.
+
+        Args:
+            case: The evaluation case.
+            output_a: First output.
+            output_b: Second output.
+            label_a: Variant name recorded on A's verdict.
+            label_b: Variant name recorded on B's verdict.
+
+        Returns:
+            ``(verdict_a, verdict_b)`` with scores in [0, 1]. An unusable reply yields a flagged
+            0.5 / 0.5 pair.
+        """
         system = _SYSTEM.format(icl_block=self._icl_block())
         user = (
             f"## Prompt\n{case.prompt}\n\n"

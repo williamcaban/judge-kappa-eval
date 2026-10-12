@@ -111,6 +111,11 @@ class _Design:
     """Pre-computed game arrays so bootstrap replicates re-aggregate cheaply."""
 
     def __init__(self, n_items: int, games: Sequence[ComparisonGame]) -> None:
+        """Validate the games and pre-compute the arrays reused by every bootstrap replicate.
+
+        Raises:
+            ValueError: On fewer than 2 items, no games, or invalid indices, orders or outcomes.
+        """
         if n_items < 2:
             raise ValueError("n_items must be at least 2")
         if not games:
@@ -141,9 +146,14 @@ class _Design:
 
     @property
     def n_cases(self) -> int:
+        """Number of distinct cases (the bootstrap resampling unit)."""
         return int(self.case_ids.size)
 
     def cells(self, weights: FloatArray | None = None) -> _Cells:
+        """Aggregate games into ``(i, j, order)`` cells, optionally weighted per game.
+
+        Cells with zero weight are dropped, so a resample that lacks a pair simply omits it.
+        """
         w = np.ones(self.outcome.size) if weights is None else weights
         m = self._cell_keys.size
         n = np.bincount(self._cell_of_game, weights=w, minlength=m).astype(np.float64)

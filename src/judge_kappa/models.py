@@ -23,6 +23,7 @@ class ScaleType(StrEnum):
 
 
 class AggregationStrategy(StrEnum):
+    """How per-judge scores are collapsed into one score per output."""
     MEAN = "mean"
     WEIGHTED_MEAN = "weighted_mean"
     MAJORITY_VOTE = "majority_vote"
@@ -34,11 +35,13 @@ class AggregationStrategy(StrEnum):
 
 
 class Assertion(BaseModel):
+    """A pass/fail statement a judge checks about an output, with a weight."""
     text: str
     weight: float = 1.0
 
 
 class RubricDimension(BaseModel):
+    """One rubric dimension: name, description, weight and optional low/mid/high anchors."""
     name: str
     description: str
     weight: float = 1.0
@@ -54,6 +57,7 @@ class CalibrationExample(BaseModel):
 
 
 class EvalCase(BaseModel):
+    """One evaluation case: prompt, optional assertions, expected output, files and metadata."""
     id: str
     prompt: str
     assertions: list[Assertion] = Field(default_factory=list)
@@ -80,6 +84,7 @@ class Variant(BaseModel):
     generation_backend: Any | None = None  # LLMBackend; typed as Any to avoid circular import
 
     class Config:
+        """Pydantic settings: allow arbitrary callables and backends as fields."""
         arbitrary_types_allowed = True
 
 
@@ -87,6 +92,10 @@ class Variant(BaseModel):
 
 
 class JudgeVerdict(BaseModel):
+    """One judge's score for one output, with per-assertion or per-dimension scores.
+
+    ``parse_failed`` marks a score that is a fallback value, not a real judgement.
+    """
     judge_id: str
     eval_case_id: str
     variant_name: str
@@ -140,6 +149,7 @@ class BackendRecord(BaseModel):
 
 
 class JudgeRecord(BaseModel):
+    """Provenance record for one judge used in a run."""
     judge_id: str
     judge_class: str
     temperature: float
@@ -162,6 +172,7 @@ class RunMetadata(BaseModel):
 
 
 class VariantResult(BaseModel):
+    """Generated output and aggregated score for one variant of one case."""
     variant_name: str
     output: str
     score: float
@@ -169,6 +180,7 @@ class VariantResult(BaseModel):
 
 
 class AgreementResult(BaseModel):
+    """Inter-rater agreement statistics: alpha with interval, kappa, ICC, and counts."""
     kappa: float | None = None
     alpha: float | None = None
     alpha_ci_low: float | None = None   # bootstrap 95% CI lower bound
@@ -189,6 +201,7 @@ class JudgeFitResult(BaseModel):
 
 
 class BiasResult(BaseModel):
+    """Bias diagnostics: positional flip rate and order effect, and verbosity correlation."""
     positional_bias_rate: float = 0.0          # fraction of cases with position flip
     # Order-aware BTL estimate of the judge's display-order effect (log-odds; > 0 favours
     # the first-shown response). None when no positional reports were available.
@@ -213,6 +226,9 @@ class UpliftSignificance(BaseModel):
 
 
 class CaseResult(BaseModel):
+    """Everything measured for one case: both variant results, uplift, verdicts, agreement and
+    positional flip.
+    """
     case_id: str
     control: VariantResult
     treatment: VariantResult
@@ -223,6 +239,11 @@ class CaseResult(BaseModel):
 
 
 class EvalReport(BaseModel):
+    """Result of an A/B evaluation.
+
+    Per-case results, uplift, agreement, significance, judge fit, bias diagnostics, data quality
+    and run provenance.
+    """
     cases: list[CaseResult]
     mean_uplift: float
     mean_control_score: float
@@ -241,6 +262,7 @@ class EvalReport(BaseModel):
 
 
 class PairwiseCaseResult(BaseModel):
+    """Result of judging one pre-recorded A/B pair."""
     case_id: str
     prompt: str
     output_a: str
@@ -257,6 +279,7 @@ class PairwiseCaseResult(BaseModel):
 
 
 class PairwiseReport(BaseModel):
+    """Result of pairwise-dataset evaluation: preference rates, data quality and provenance."""
     cases: list[PairwiseCaseResult]
     mean_score_a: float
     mean_score_b: float

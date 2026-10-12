@@ -24,12 +24,23 @@ from judge_kappa.panel.base import EvaluationPanel
 
 
 class JudgePanel(EvaluationPanel):
+    """Judges that share one rubric or assertion set; alpha measures how unambiguous it is."""
     def __init__(
         self,
         judges: list[LLMJudge],
         strategy: AggregationStrategy = AggregationStrategy.MEAN,
         weights: list[float] | None = None,
     ) -> None:
+        """Create a panel from judges and an aggregation strategy.
+
+        Args:
+            judges: The panel's judges.
+            strategy: Aggregation strategy (default mean).
+            weights: Per-judge weights for weighted aggregation (default equal).
+
+        Raises:
+            ValueError: If no judges are given.
+        """
         if not judges:
             raise ValueError("JudgePanel requires at least one judge.")
         self._judges = judges
@@ -38,16 +49,20 @@ class JudgePanel(EvaluationPanel):
 
     @property
     def judge_ids(self) -> list[str]:
+        """Ids of the panel's judges, in order."""
         return [j.judge_id for j in self._judges]
 
     @property
     def judges(self) -> list[LLMJudge]:
+        """The panel's judge objects, in order."""
         return list(self._judges)
 
     def evaluate(self, case: EvalCase, output: str, variant_name: str) -> list[JudgeVerdict]:
+        """Run every judge on the output and return their verdicts."""
         return [j.judge(case, output, variant_name) for j in self._judges]
 
     def aggregate_score(self, verdicts: list[JudgeVerdict]) -> float:
+        """Combine the verdict scores with the configured strategy."""
         scores = [v.score for v in verdicts]
         w = self._weights[: len(scores)]
         match self._strategy:

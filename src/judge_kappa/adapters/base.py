@@ -8,6 +8,10 @@ from judge_kappa.models import EvalCase
 
 
 class InputAdapter(ABC):
+    """Abstract base for adapters that load an external source into ``EvalCase`` objects.
+
+    Subclass and implement ``load()`` to support a new input format.
+    """
     @abstractmethod
     def load(self, source: object) -> list[EvalCase]:
         """Convert a source (file path, list, dict, …) into EvalCase list."""
