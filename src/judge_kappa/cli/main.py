@@ -13,6 +13,7 @@ The CLI is intentionally thin: all logic lives in builder.py and evaluator.py.
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -43,6 +44,32 @@ def _load_config(path: str) -> SkillModeConfig | DatasetModeConfig | PairwiseMod
     raise RuntimeError("unreachable")
 
 
+_NEEDS_PAIR = "n/a (needs at least 2 judges and 2 shared cases)"
+_NEEDS_TWO_JUDGES = "n/a (needs at least 2 judges)"
+
+
+def _fmt_metric(value: float | None, missing: str) -> str:
+    """Format an optional metric to 4 places; say why when it is absent or undefined."""
+    if value is None:
+        return missing
+    if not math.isfinite(value):
+        return "undefined (scores do not vary)"
+    return f"{value:.4f}"
+
+
+def _render_alpha(report: EvalReport) -> str:
+    """Krippendorff's alpha line. Alpha is not defined for a single judge, so say so."""
+    agreement = report.agreement
+    if agreement.n_judges < 2:
+        # The model carries 1.0 here (its single-value-domain fallback). Do not present that
+        # as "perfect agreement" between judges when there is only one.
+        return f"  Krippendorff α:   {_NEEDS_TWO_JUDGES}"
+    line = f"  Krippendorff α:   {_fmt_metric(agreement.alpha, 'n/a')}"
+    if agreement.alpha is not None and agreement.alpha_interpretation:
+        line += f"  → {agreement.alpha_interpretation}"
+    return line
+
+
 def _render_verbosity_rho(report: EvalReport) -> str:
     """One line for the verbosity correlation; says so when it could not be estimated."""
     rho = report.bias.verbosity_bias_rho
@@ -64,10 +91,9 @@ def _render_text(report: EvalReport) -> str:
         f"Treatment score:    {report.mean_treatment_score:.4f}",
         "",
         "Inter-rater agreement:",
-        f"  Krippendorff α:   {report.agreement.alpha:.4f}"
-        + (f"  → {report.agreement.alpha_interpretation}" if report.agreement.alpha_interpretation else ""),
-        f"  Cohen κ (mean):   {report.agreement.kappa:.4f}",
-        f"  Expected P(e):    {report.agreement.expected_chance_agreement:.4f}",
+        _render_alpha(report),
+        f"  Cohen κ (mean):   {_fmt_metric(report.agreement.kappa, _NEEDS_PAIR)}",
+        f"  Expected P(e):    {_fmt_metric(report.agreement.expected_chance_agreement, _NEEDS_PAIR)}",
         f"  Judges:           {report.agreement.n_judges}",
         "",
         "Bias diagnostics:",
