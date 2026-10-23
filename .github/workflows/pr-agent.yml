@@ -26,5 +26,9 @@ jobs:
       pull-requests: write
       contents: read
     uses: interplay-adversarial/.github/.github/workflows/pr-agent.yml@bae5e9ff40cf916892fe964594ee3158eedd3ef3   # shared workflow, bumped by Dependabot
+    with:
+      # TEMP (2026-10-23): qwen38-27b backend down on TMM MaaS; using gemma4 until it recovers.
+      model: gemma4
+      api_base: https://maas.apps.ocp.cloud.rhai-tmm.dev/prelude-maas/gemma4/v1
     secrets:
       MAAS_API_KEY: ${{ secrets.MAAS_API_KEY }}
