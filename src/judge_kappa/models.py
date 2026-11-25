@@ -11,7 +11,7 @@ from collections.abc import Callable
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ScaleType(StrEnum):
@@ -83,9 +83,8 @@ class Variant(BaseModel):
     predict_fn: Callable[..., str] | None = None
     generation_backend: Any | None = None  # LLMBackend; typed as Any to avoid circular import
 
-    class Config:
-        """Pydantic settings: allow arbitrary callables and backends as fields."""
-        arbitrary_types_allowed = True
+    # Allow arbitrary callables and backends as fields.
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 # ── Output models ─────────────────────────────────────────────────────────────
