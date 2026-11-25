@@ -9,6 +9,11 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `Variant` now uses `model_config = ConfigDict(...)` instead of the deprecated class-based `Config`,
+  removing the `PydanticDeprecatedSince20` warning raised on import of `judge_kappa.models`.
+
 ---
 
 ## [0.4.0] — 2026-10-12
